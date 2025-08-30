@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Sistema DRE" />
+    <meta name="msapplication-TileColor" content="#3B82F6" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- Chrome Mobile PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="HandheldFriendly" content="true" />
+    <meta name="MobileOptimized" content="320" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    
+    <title>DRE App</title>
+    <meta name="description" content="Sistema de Demonstração do Resultado do Exercício" />
+    <meta name="author" content="OneBots" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="DRE App" />
+    <meta property="og:description" content="Sistema de Demonstração do Resultado do Exercício" />
+    <meta property="og:url" content="https://dre.onebots.com.br" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="DRE App" />
+    <meta property="twitter:description" content="Sistema de Demonstração do Resultado do Exercício" />
+    <meta name="twitter:site" content="@onebots" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://dre.onebots.com.br" />
+    
+    <!-- JSON-LD structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "DRE App",
+      "url": "https://dre.onebots.com.br",
+      "description": "Sistema de Demonstração do Resultado do Exercício",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "author": {
+        "@type": "Organization",
+        "name": "OneBots"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
