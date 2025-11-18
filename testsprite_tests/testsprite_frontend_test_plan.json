@@ -1,0 +1,510 @@
+[
+  {
+    "id": "TC001",
+    "title": "Login with valid credentials",
+    "description": "Check that a user can successfully log in using correct username/email and password along with valid activation code.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid username/email and password"
+      },
+      {
+        "type": "action",
+        "description": "Input valid activation code"
+      },
+      {
+        "type": "action",
+        "description": "Click login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is successfully logged in and redirected to dashboard"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Request activation code",
+    "description": "Verify that a user can request an activation code, and the system sends it correctly to the administrator email.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to activation code request page"
+      },
+      {
+        "type": "action",
+        "description": "Fill in required user information for activation code"
+      },
+      {
+        "type": "action",
+        "description": "Submit activation code request"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that activation code is generated and sent to administrator email"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Registration with valid activation code",
+    "description": "Check the registration flow works properly when user provides a valid activation code.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to registration page"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid activation code"
+      },
+      {
+        "type": "action",
+        "description": "Fill registration form with valid user data"
+      },
+      {
+        "type": "action",
+        "description": "Submit registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user account is created and redirected to dashboard"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Invalid login attempt with wrong credentials",
+    "description": "Verify system rejects login attempts with invalid username/email, password, or activation code.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid username/email or password"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid or missing activation code"
+      },
+      {
+        "type": "action",
+        "description": "Click login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Display appropriate error message and deny access"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Invite collaborator flow",
+    "description": "Verify owner/admin can invite collaborators by email and that invitee receives email with invitation link.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to collaborators management page"
+      },
+      {
+        "type": "action",
+        "description": "Enter collaborator email and assign role"
+      },
+      {
+        "type": "action",
+        "description": "Send invitation"
+      },
+      {
+        "type": "assertion",
+        "description": "Check system sends email with valid invitation link"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Collaborator accepts invitation",
+    "description": "Validate that invited collaborator can accept invite, create or log in to account, and is assigned correct permissions.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access invitation link from email"
+      },
+      {
+        "type": "action",
+        "description": "Create new account or log in"
+      },
+      {
+        "type": "action",
+        "description": "Accept the invitation"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm collaborator is added to company with assigned role and permissions"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Verify permissions for collaborators",
+    "description": "Ensure that collaborators have access only to functionalities permitted by their roles.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as collaborator with specific role"
+      },
+      {
+        "type": "action",
+        "description": "Attempt access to allowed features"
+      },
+      {
+        "type": "assertion",
+        "description": "Access granted to allowed features"
+      },
+      {
+        "type": "action",
+        "description": "Attempt access to features outside of permissions"
+      },
+      {
+        "type": "assertion",
+        "description": "Access denied and appropriate message shown"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Create a new company",
+    "description": "Verify user can register a new company with all required fields and data validation.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to new company registration page"
+      },
+      {
+        "type": "action",
+        "description": "Fill company form with valid data (razao_social, cnpj, etc.)"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Company is created and visible in company list"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Add and edit chart of accounts",
+    "description": "Verify user can add new accounts with hierarchical structure, assign categories, and edit existing accounts.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to chart of accounts page"
+      },
+      {
+        "type": "action",
+        "description": "Add new account with valid code, name, type, and category"
+      },
+      {
+        "type": "assertion",
+        "description": "New account appears correctly in hierarchy"
+      },
+      {
+        "type": "action",
+        "description": "Edit existing account details"
+      },
+      {
+        "type": "assertion",
+        "description": "Changes are saved and displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Record financial transaction (lancamento)",
+    "description": "Validate the ability to record a financial transaction linked to appropriate account and verify data stored correctly.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to new financial transaction page"
+      },
+      {
+        "type": "action",
+        "description": "Input transaction details including date, value, description, and linked account"
+      },
+      {
+        "type": "action",
+        "description": "Submit the transaction"
+      },
+      {
+        "type": "assertion",
+        "description": "Transaction recorded and visible in transactions list"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Register accounts payable with status and attachment",
+    "description": "Verify user can create accounts payable with required fields, upload payment receipts, and mark as paid with status update.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to new account payable page"
+      },
+      {
+        "type": "action",
+        "description": "Input provider, amount, due date, and other details"
+      },
+      {
+        "type": "action",
+        "description": "Upload payment receipt as attachment"
+      },
+      {
+        "type": "action",
+        "description": "Mark account as paid"
+      },
+      {
+        "type": "assertion",
+        "description": "Status changes to paid and attachment is accessible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "System generates financial entries automatically after payment",
+    "description": "Ensure system automatically creates financial entries in the DRE after marking accounts payable as paid.",
+    "category": "integration",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Mark an accounts payable record as paid"
+      },
+      {
+        "type": "assertion",
+        "description": "System generates corresponding financial entry in the DRE automatically"
+      },
+      {
+        "type": "action",
+        "description": "Check DRE and reports for updated values"
+      },
+      {
+        "type": "assertion",
+        "description": "Financial data is updated and consistent"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Dashboard data and chart loading",
+    "description": "Verify that the dashboard displays correct financial indicators and charts of margins and evolution without loading errors.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to dashboard page"
+      },
+      {
+        "type": "assertion",
+        "description": "Dashboard loads all indicators and charts correctly"
+      },
+      {
+        "type": "assertion",
+        "description": "Data shown corresponds to current financial transactions and is up to date"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Generate and export reports with filters",
+    "description": "Validate user can select report type, apply filters (e.g. date range), view report data, and export report correctly.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to reports page"
+      },
+      {
+        "type": "action",
+        "description": "Select a report type such as DRE or cash flow"
+      },
+      {
+        "type": "action",
+        "description": "Apply period and other filters"
+      },
+      {
+        "type": "action",
+        "description": "Generate the report"
+      },
+      {
+        "type": "assertion",
+        "description": "Report data is displayed correctly"
+      },
+      {
+        "type": "action",
+        "description": "Use export functionality to download report"
+      },
+      {
+        "type": "assertion",
+        "description": "Exported report file is correct and complete"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "System security with Row Level Security (RLS)",
+    "description": "Verify that data separation between companies is enforced and users cannot access data from other companies.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as user associated with a specific company"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access data belonging to other companies via UI and API"
+      },
+      {
+        "type": "assertion",
+        "description": "Access is denied and data leakage is prevented"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Responsive design on mobile devices",
+    "description": "Ensure the interface adapts and functions correctly on different screen sizes including mobile devices and PWA platforms.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the application on various screen sizes and devices (mobile, tablet, desktop)"
+      },
+      {
+        "type": "assertion",
+        "description": "UI components render properly without layout issues"
+      },
+      {
+        "type": "assertion",
+        "description": "All interactive elements are accessible and usable"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Uploading and accessing payment proof attachments",
+    "description": "Verify users can upload payment proof files for accounts payable and retrieve them later without errors.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to account payable form"
+      },
+      {
+        "type": "action",
+        "description": "Upload valid payment proof file"
+      },
+      {
+        "type": "action",
+        "description": "Save the record"
+      },
+      {
+        "type": "assertion",
+        "description": "File upload is successful and accessible from account details"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Handling of expired or invalid activation codes",
+    "description": "Ensure system handles attempts to use expired, invalid, or already used activation codes properly during registration.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Try to register using expired or invalid activation code"
+      },
+      {
+        "type": "assertion",
+        "description": "Appropriate error message is shown and registration is blocked"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "System configuration and Supabase connection test",
+    "description": "Validate configuration page correctly shows system settings and the Supabase connection test correctly reports connection status.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to configuration page"
+      },
+      {
+        "type": "action",
+        "description": "Review current system settings"
+      },
+      {
+        "type": "action",
+        "description": "Run Supabase connection test"
+      },
+      {
+        "type": "assertion",
+        "description": "Connection test indicates success if environment variables are correct"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Notifications for upcoming accounts payable due dates",
+    "description": "Ensure users receive notifications for accounts payable nearing their due dates as per configured system logic.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create accounts payable with upcoming due dates"
+      },
+      {
+        "type": "assertion",
+        "description": "System displays notifications or alerts for those due soon"
+      }
+    ]
+  }
+]

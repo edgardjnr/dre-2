@@ -1,0 +1,16 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5173",
+  "executionArgs": {
+    "projectName": "DRE 2",
+    "projectPath": "c:\\Users\\Edgardjr\\Desktop\\DRE 2",
+    "testIds": [],
+    "additionalInstruction": "Verificar o fluxo de ativação e autenticação, testar o dashboard e relatórios, e validar a integração com o Supabase.",
+    "envs": {
+      "API_KEY": "sk-user-qeIhUnA8WqP5Bog1aKAYYEd7MKPHde5S-HIMSFjGlawHWP3gZlOHzMFBIoGBdkuHgKlGRFi5-ZVUPY1tBQW2RSWqYD5DnSuvQ2ON65WQG47gBJbjjFNOsn2-uUmJ2o2hah4"
+    }
+  },
+  "proxy": "http://9b93aff6-b9b0-4fea-aa9d-e108381bc194:2aLAj5XTjlHk2hLiNpYM9lyy58DQlsYw@tun.testsprite.com:8080"
+}

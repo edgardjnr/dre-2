@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Background circle with safe area for maskable -->
+  <circle cx="96" cy="96" r="96" fill="#3B82F6"/>
+  
+  <!-- TrendingUp icon scaled and centered with safe area padding -->
+  <g transform="translate(64, 64) scale(2.67)">
+    <polyline points="22,7 13.5,15.5 8.5,10.5 2,17" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="16,7 22,7 22,13" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
