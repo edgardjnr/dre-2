@@ -4,7 +4,7 @@ import { ContaPagar, ContaPagarFormData, ContaPagarStatus, ContaContabil } from 
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2, FileText, DollarSign, Calendar, Tag, Camera, Upload, X, Check, Barcode } from 'lucide-react';
 import { toast } from 'sonner';
-import { Spinner } from '../ui/spinner';
+import { Spinner } from '../ui/Spinner';
 import { useDebounce } from '../../hooks/useDebounce';
 import { applyDateMask, isValidDate, convertToISODate, convertFromISODate, formatDateForDatabase } from '../../utils/dateUtils';
 import { DatePicker } from '../ui/DatePicker';
