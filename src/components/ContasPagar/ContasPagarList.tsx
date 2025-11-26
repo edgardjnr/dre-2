@@ -103,13 +103,14 @@ export const ContasPagarList: React.FC = () => {
   const [showMobileSortModal, setShowMobileSortModal] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [fetchLimit, setFetchLimit] = useState(1000);
+  const [serverSearching, setServerSearching] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setServerSearching(!!termoPesquisa && termoPesquisa.trim().length >= 2);
     try {
-      const [contasRes, empresasRes, contasContabeisRes] = await Promise.all([
-        supabase.from('contas_a_pagar').select(`
+      const baseQuery = supabase.from('contas_a_pagar').select(`
           id,
           user_id,
           empresa_id,
@@ -134,7 +135,17 @@ export const ContasPagarList: React.FC = () => {
             ordem,
             created_at
           )
-        `, { count: 'exact' }).order('data_vencimento', { ascending: true }).range(0, fetchLimit - 1),
+        `, { count: 'exact' });
+
+      const term = (termoPesquisa || '').trim();
+      const contasQuery = term.length >= 2
+        ? baseQuery.or(
+            `fornecedor.ilike.%${term}%,descricao.ilike.%${term}%,numero_documento.ilike.%${term}%,observacoes.ilike.%${term}%`
+          )
+        : baseQuery;
+
+      const [contasRes, empresasRes, contasContabeisRes] = await Promise.all([
+        contasQuery.order('created_at', { ascending: false }).range(0, fetchLimit - 1),
         
         supabase.from('empresas').select('id, razao_social'),
         
@@ -216,7 +227,7 @@ export const ContasPagarList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchLimit]);
+  }, [fetchLimit, termoPesquisa]);
 
   useEffect(() => {
     fetchData();
@@ -780,7 +791,7 @@ export const ContasPagarList: React.FC = () => {
     }
     
     // Filtro de pesquisa por texto
-    if (termoPesquisa) {
+    if (termoPesquisa && !serverSearching) {
       const termo = termoPesquisa.toLowerCase();
       const fornecedor = conta.fornecedor?.toLowerCase() || '';
       const descricao = conta.descricao?.toLowerCase() || '';
@@ -824,6 +835,10 @@ export const ContasPagarList: React.FC = () => {
       case 'vencimento':
         valorA = new Date(a.dataVencimento);
         valorB = new Date(b.dataVencimento);
+        break;
+      case 'criado':
+        valorA = new Date(a.createdAt);
+        valorB = new Date(b.createdAt);
         break;
       case 'valor':
         valorA = a.valor;
@@ -1126,6 +1141,21 @@ export const ContasPagarList: React.FC = () => {
                     )}
                   </button>
                 </th>
+                <th className="w-[12%] min-w-[120px]">
+                  <button
+                    onClick={() => handleSort('criado')}
+                    className="flex items-center justify-between w-full text-left py-3 px-4 font-medium text-gray-900 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 rounded-md group"
+                  >
+                    <span className="group-hover:text-blue-600 transition-colors">Criado em</span>
+                    {campoOrdenacao === 'criado' ? (
+                      direcaoOrdenacao === 'asc' ? 
+                        <ChevronUp className="w-4 h-4 text-blue-600" /> : 
+                        <ChevronDown className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <ChevronsUpDown className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                    )}
+                  </button>
+                </th>
                 <th className="w-[12%] min-w-[100px]">
                   <button
                     onClick={() => handleSort('valor')}
@@ -1185,6 +1215,11 @@ export const ContasPagarList: React.FC = () => {
                       {conta.dataPagamento && (
                         <p className="text-xs text-green-600 truncate">Pago em {format(formatDateForDisplay(conta.dataPagamento), 'dd/MM/yyyy')}</p>
                       )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="overflow-hidden">
+                      <p className="text-gray-900 text-sm">{format(new Date(conta.createdAt), 'dd/MM/yyyy')}</p>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-right">

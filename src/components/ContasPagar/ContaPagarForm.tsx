@@ -542,6 +542,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         numero_documento: formData.numeroDocumento || null,
         observacoes: formData.observacoes || null,
         empresa_id: selectedEmpresaId,
+        tipo_documento: tipoDocumento === 'pix' ? 'pix' : 'boleto',
         // Manter compatibilidade com foto única (primeira foto)
         foto_url: uploadedPhotos.length > 0 ? uploadedPhotos[0].url : null,
         foto_nome: uploadedPhotos.length > 0 ? uploadedPhotos[0].name : null,
