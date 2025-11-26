@@ -517,12 +517,23 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     setError(null);
   
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        setError('Usuário não autenticado. Faça login novamente.');
+        setLoading(false);
+        return;
+      }
+      if (!selectedEmpresaId) {
+        setError('Selecione uma empresa antes de salvar.');
+        setLoading(false);
+        return;
+      }
       // Upload das fotos se houver arquivos
       const uploadedPhotos = await uploadPhotos();
   
       // Dados corrigidos para o banco (usando snake_case para colunas do banco)
       const contaData = {
-        user_id: user?.id,
+        user_id: currentUser.id,
         fornecedor: formData.fornecedor,
         descricao: formData.descricao,
         valor: Number(formData.valor),
