@@ -104,6 +104,15 @@ export const ContasPagarList: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [fetchLimit, setFetchLimit] = useState(1000);
   const [serverSearching, setServerSearching] = useState(false);
+  const toDate = (value?: string) => {
+    if (!value) return null;
+    const d = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const formatDateSafe = (value?: string, pattern: string = 'dd/MM/yyyy') => {
+    const d = toDate(value);
+    return d ? format(d, pattern) : '-';
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -837,8 +846,8 @@ export const ContasPagarList: React.FC = () => {
         valorB = new Date(b.dataVencimento);
         break;
       case 'criado':
-        valorA = new Date(a.createdAt);
-        valorB = new Date(b.createdAt);
+        valorA = toDate(a.createdAt)?.getTime() ?? 0;
+        valorB = toDate(b.createdAt)?.getTime() ?? 0;
         break;
       case 'valor':
         valorA = a.valor;
@@ -1219,7 +1228,7 @@ export const ContasPagarList: React.FC = () => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="overflow-hidden">
-                      <p className="text-gray-900 text-sm">{format(new Date(conta.createdAt), 'dd/MM/yyyy')}</p>
+                      <p className="text-gray-900 text-sm">{formatDateSafe(conta.createdAt, 'dd/MM/yyyy')}</p>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-right">
