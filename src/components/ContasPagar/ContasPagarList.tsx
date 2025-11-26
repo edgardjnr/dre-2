@@ -132,7 +132,7 @@ export const ContasPagarList: React.FC = () => {
             ordem,
             created_at
           )
-        `).order('data_vencimento', { ascending: true }),
+        `, { count: 'exact' }).order('data_vencimento', { ascending: true }).range(0, 4999),
         
         supabase.from('empresas').select('id, razao_social'),
         
