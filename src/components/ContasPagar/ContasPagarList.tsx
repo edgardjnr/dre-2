@@ -198,8 +198,8 @@ export const ContasPagarList: React.FC = () => {
         })),
         contaContabilId: item.conta_contabil_id,
         lancamentoGeradoId: item.lancamento_gerado_id,
-        created_at: item.created_at,
-        updated_at: item.updated_at
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
       }));
 
       const empresasData = (empresasRes.data || []).map(item => ({
