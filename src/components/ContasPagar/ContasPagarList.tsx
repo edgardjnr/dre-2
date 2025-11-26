@@ -101,6 +101,8 @@ export const ContasPagarList: React.FC = () => {
   
   // Estados para o botão de ordenação móvel
   const [showMobileSortModal, setShowMobileSortModal] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [fetchLimit, setFetchLimit] = useState(1000);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -132,7 +134,7 @@ export const ContasPagarList: React.FC = () => {
             ordem,
             created_at
           )
-        `, { count: 'exact' }).order('data_vencimento', { ascending: true }).range(0, 4999),
+        `, { count: 'exact' }).order('data_vencimento', { ascending: true }).range(0, fetchLimit - 1),
         
         supabase.from('empresas').select('id, razao_social'),
         
@@ -205,6 +207,7 @@ export const ContasPagarList: React.FC = () => {
       }));
 
       setContas(contasData);
+      setTotalCount(contasRes.count || 0);
       setEmpresas(empresasData);
       setContasContabeis(contasContabeisData);
     } catch (err: any) {
@@ -213,7 +216,7 @@ export const ContasPagarList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchLimit]);
 
   useEffect(() => {
     fetchData();
@@ -1455,6 +1458,20 @@ export const ContasPagarList: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Paginação / Carregar mais */}
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-gray-600">
+          Mostrando {contas.length} de {totalCount} contas
+        </div>
+        <button
+          onClick={() => setFetchLimit(prev => Math.min(prev + 1000, (totalCount || prev) ))}
+          disabled={contas.length >= totalCount || loading}
+          className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          Carregar mais
+        </button>
       </div>
 
       {/* Scanner de código de barras - Renderizado fora do modal */}
