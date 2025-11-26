@@ -1221,7 +1221,7 @@ export const ContasPagarList: React.FC = () => {
                   <td className="py-3 px-4">
                     <div className="overflow-hidden">
                       <p className="text-gray-900 text-sm">{format(formatDateForDisplay(conta.dataVencimento), 'dd/MM/yyyy')}</p>
-                      {conta.dataPagamento && (
+                      {conta.status === 'paga' && conta.dataPagamento && (
                         <p className="text-xs text-green-600 truncate">Pago em {format(formatDateForDisplay(conta.dataPagamento), 'dd/MM/yyyy')}</p>
                       )}
                     </div>
@@ -1423,7 +1423,7 @@ export const ContasPagarList: React.FC = () => {
                       </div>
                     )}
                     
-                    {conta.dataPagamento && (
+                    {conta.status === 'paga' && conta.dataPagamento && (
                       <div className="flex items-center justify-between py-1 px-1.5 bg-green-50 rounded border border-green-200">
                         <span className="text-xs font-medium text-green-600 uppercase tracking-wide flex items-center">
                           <Calendar className="w-2 h-2 mr-0.5" />
