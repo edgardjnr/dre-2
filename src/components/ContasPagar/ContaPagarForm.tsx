@@ -488,7 +488,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       const uploadPromises = photoFiles.map(async (file, index) => {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${index}.${fileExt}`;
-        const filePath = `contas-pagar/${fileName}`;
+        const filePath = `${user?.id || 'anonymous'}/${fileName}`;
     
         const { error: uploadError } = await supabase.storage
           .from('contas-fotos')
@@ -499,7 +499,6 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         const { data: { publicUrl } } = supabase.storage
           .from('contas-fotos')
           .getPublicUrl(filePath);
-    
         return { url: publicUrl, name: file.name };
       });
 
@@ -535,7 +534,6 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         // Manter compatibilidade com foto única (primeira foto)
         foto_url: uploadedPhotos.length > 0 ? uploadedPhotos[0].url : null,
         foto_nome: uploadedPhotos.length > 0 ? uploadedPhotos[0].name : null,
-        tipo_documento: 'boleto',
         status: 'pendente' as ContaPagarStatus
       };
 
