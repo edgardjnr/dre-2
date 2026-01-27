@@ -61,13 +61,12 @@ END;
 $$;
 COMMENT ON FUNCTION public.handle_new_user IS 'Automatically creates a profile for a new user.';
 
--- 3. Create a trigger to call the function on new user creation
--- This ensures the handle_new_user function runs after a user is added to auth.users.
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-COMMENT ON TRIGGER on_auth_user_created ON auth.users IS 'When a new user signs up, create a profile for them.';
+-- 3. (Hosted Supabase restriction)
+-- Em ambientes gerenciados, não temos permissão para alterar objetos do schema auth.
+-- A criação do trigger em auth.users é omitida no remoto para evitar erro de permissão.
+-- Alternativas:
+-- - Criar o perfil via aplicação após sign up
+-- - Executar este trecho manualmente apenas se tiver permissão adequada
 
 -- 4. Enable Row Level Security (RLS) on the profiles table
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
