@@ -31,7 +31,7 @@ CREATE TABLE public.company_invitations (
     role public.collaborator_role NOT NULL DEFAULT 'member',
     invited_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     status public.invitation_status NOT NULL DEFAULT 'pending',
-    token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'base64url'),
+    token text NOT NULL UNIQUE DEFAULT encode(extensions.gen_random_bytes(32), 'base64url'),
     expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
     created_at timestamptz NOT NULL DEFAULT now(),
     accepted_at timestamptz,
