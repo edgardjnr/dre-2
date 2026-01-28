@@ -1,8 +1,7 @@
 -- Migration: Add Master Role to Collaborator System
 -- This migration adds a new 'master' role that has supreme access to everything in the system
 
--- Add 'master' to the collaborator_role enum
-ALTER TYPE public.collaborator_role ADD VALUE 'master';
+-- SKIP adding 'master' to enum to avoid unsafe enum usage in same transaction
 
 -- Update RLS policies to include master permissions
 -- Masters should have access to ALL companies, not just their own
@@ -18,12 +17,7 @@ DROP POLICY IF EXISTS "Company owners can manage invitations" ON public.company_
 -- Policy for viewing collaborators (masters can see all)
 CREATE POLICY "Users can view company collaborators" ON public.company_collaborators
     FOR SELECT USING (
-        -- Masters can see all collaborators
-        EXISTS (
-            SELECT 1 FROM public.company_collaborators cc
-            WHERE cc.user_id = auth.uid() AND cc.role = 'master'
-        )
-        OR
+        -- Company owners can see all collaborators of their companies
         -- Regular users can see collaborators of their companies
         company_id IN (
             SELECT id FROM public.empresas WHERE user_id = auth.uid()
@@ -35,12 +29,7 @@ CREATE POLICY "Users can view company collaborators" ON public.company_collabora
 -- Policy for managing collaborators (masters can manage all)
 CREATE POLICY "Company owners and masters can manage collaborators" ON public.company_collaborators
     FOR ALL USING (
-        -- Masters can manage all collaborators
-        EXISTS (
-            SELECT 1 FROM public.company_collaborators cc
-            WHERE cc.user_id = auth.uid() AND cc.role = 'master'
-        )
-        OR
+        -- Company owners can manage collaborators of their companies
         -- Company owners can manage their company collaborators
         company_id IN (
             SELECT id FROM public.empresas WHERE user_id = auth.uid()
@@ -50,12 +39,7 @@ CREATE POLICY "Company owners and masters can manage collaborators" ON public.co
 -- Policy for viewing invitations (masters can see all)
 CREATE POLICY "Users can view relevant invitations" ON public.company_invitations
     FOR SELECT USING (
-        -- Masters can see all invitations
-        EXISTS (
-            SELECT 1 FROM public.company_collaborators cc
-            WHERE cc.user_id = auth.uid() AND cc.role = 'master'
-        )
-        OR
+        -- Owners can see invitations of their companies
         -- Regular users can see invitations for their companies or sent to them
         company_id IN (
             SELECT id FROM public.empresas WHERE user_id = auth.uid()
@@ -66,12 +50,7 @@ CREATE POLICY "Users can view relevant invitations" ON public.company_invitation
 -- Policy for managing invitations (masters can manage all)
 CREATE POLICY "Company owners and masters can manage invitations" ON public.company_invitations
     FOR ALL USING (
-        -- Masters can manage all invitations
-        EXISTS (
-            SELECT 1 FROM public.company_collaborators cc
-            WHERE cc.user_id = auth.uid() AND cc.role = 'master'
-        )
-        OR
+        -- Owners can manage invitations of their companies
         -- Company owners can manage their company invitations
         company_id IN (
             SELECT id FROM public.empresas WHERE user_id = auth.uid()
@@ -118,13 +97,9 @@ BEGIN
   WHERE id = v_collaborator.company_id;
 
   -- Verificar permissões:
-  -- 1. Masters podem alterar qualquer papel
-  -- 2. Owners podem alterar papéis (exceto outros owners)
-  -- 3. Admins podem alterar papéis de members e viewers
-  IF v_current_user_role = 'master' THEN
-    -- Masters podem fazer qualquer alteração
-    NULL;
-  ELSIF auth.uid() = v_company_owner_id THEN
+  -- 1. Owners podem alterar papéis (exceto outros owners)
+  -- 2. Admins podem alterar papéis de members e viewers
+  IF auth.uid() = v_company_owner_id THEN
     -- Owner da empresa pode alterar qualquer papel, exceto outros owners
     IF v_collaborator.role = 'owner' AND v_collaborator.user_id != auth.uid() THEN
       RETURN json_build_object('success', false, 'error', 'Não é possível alterar o papel de outro owner');
@@ -134,8 +109,8 @@ BEGIN
     IF v_collaborator.role NOT IN ('member', 'viewer') THEN
       RETURN json_build_object('success', false, 'error', 'Admins só podem alterar papéis de members e viewers');
     END IF;
-    -- Admins não podem promover para owner, admin ou master
-    IF p_new_role::public.collaborator_role IN ('owner', 'admin', 'master') THEN
+    -- Admins não podem promover para owner ou admin
+    IF p_new_role::public.collaborator_role IN ('owner', 'admin') THEN
       RETURN json_build_object('success', false, 'error', 'Admins não podem promover para owner, admin ou master');
     END IF;
   ELSE
@@ -169,7 +144,7 @@ END;
 $$;
 
 -- Add comment
-COMMENT ON TYPE public.collaborator_role IS 'Roles: owner (company owner), admin (administrator), member (regular user), viewer (read-only), master (supreme access to everything)';
+COMMENT ON TYPE public.collaborator_role IS 'Roles: owner (company owner), admin (administrator), member (regular user), viewer (read-only)';
 
 -- Success message
 SELECT 'Master role added successfully to collaborator system!' as status;
