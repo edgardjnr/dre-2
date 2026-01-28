@@ -33,8 +33,7 @@
           - **Estimated Impact**: Minimal performance impact.
           */
 
--- 1. Create the profiles table
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   updated_at TIMESTAMPTZ,
   full_name TEXT
@@ -57,10 +56,15 @@ BEGIN
 END;
 $$;
 
--- 4. Create the trigger to call the function after a new user signs up
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+-- Hosted environments may restrict triggers on auth schema; guard creation
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_created'
+  ) THEN
+    EXECUTE 'CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user()';
+  END IF;
+END $$;
 
 -- 5. Enable Row Level Security (RLS) on the profiles table
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
