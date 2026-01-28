@@ -15,15 +15,7 @@ interface ImageModalProps {
   onClose: () => void;
 }
 
-// Remover a função getTipoDocumentoText (linhas 16-22)
-
-export function ImageModal({ 
-  isOpen, 
-  imageUrl, 
-  imageName, 
-  conta, 
-  onClose
-}: ImageModalProps) {
+export function ImageModal({ isOpen, imageUrl, imageName, conta, onClose }: ImageModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
   const [currentImageName, setCurrentImageName] = useState(imageName);
@@ -33,7 +25,6 @@ export function ImageModal({
   const [retryCount, setRetryCount] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [imageMetadata, setImageMetadata] = useState<{width: number, height: number, size?: number, lastModified?: number} | null>(null);
-  
 
   // Criar array combinado de todas as imagens
   const allImages = React.useMemo(() => {
@@ -41,9 +32,9 @@ export function ImageModal({
     
     // Adicionar fotos do array (novo sistema)
     if (conta.fotos && conta.fotos.length > 0) {
-      images.push(...conta.fotos.map(foto => ({
-        url: foto.fotoUrl,
-        name: foto.fotoNome
+      images.push(...conta.fotos.map(foto => ({ 
+        url: foto.fotoUrl, 
+        name: foto.fotoNome 
       })));
     }
     
@@ -51,32 +42,37 @@ export function ImageModal({
     if (conta.fotoUrl) {
       const isAlreadyInArray = images.some(img => img.url === conta.fotoUrl);
       if (!isAlreadyInArray) {
-        images.push({
-          url: conta.fotoUrl,
-          name: conta.fotoNome || 'Comprovante de Pagamento'
+        images.push({ 
+          url: conta.fotoUrl, 
+          name: conta.fotoNome || 'Comprovante de Pagamento' 
         });
       }
     }
     
     return images;
   }, [conta.fotos, conta.fotoUrl, conta.fotoNome]);
-  
+
   const [signedMap, setSignedMap] = useState<Record<string, string>>({});
-  
+
   useEffect(() => {
     const genSigned = async () => {
       const urls = allImages.map(i => i.url);
       const entries: [string, string][] = [];
+      
       for (const url of urls) {
         const m = url.match(/\/contas-fotos\/(.+)$/);
         const key = m?.[1];
         if (key) {
-          const { data, error } = await supabase.storage.from('contas-fotos').createSignedUrl(key, 60 * 60 * 24 * 7);
+          const { data, error } = await supabase.storage
+            .from('contas-fotos')
+            .createSignedUrl(key, 60 * 60 * 24 * 7);
+          
           if (!error && data?.signedUrl) {
             entries.push([url, data.signedUrl]);
           }
         }
       }
+      
       if (entries.length) {
         setSignedMap(prev => {
           const next = { ...prev };
@@ -85,9 +81,10 @@ export function ImageModal({
         });
       }
     };
+    
     genSigned();
   }, [allImages]);
-  
+
   const hasMultiplePhotos = allImages.length > 1;
   const totalPhotos = allImages.length;
 
@@ -126,7 +123,10 @@ export function ImageModal({
     isImageLoading,
     getCachedImage,
     clearCache
-  } = useImageCache({ maxCacheSize: 15, preloadAdjacent: true });
+  } = useImageCache({
+    maxCacheSize: 15,
+    preloadAdjacent: true
+  });
 
   // Atualizar imagem atual quando o modal abrir ou a conta mudar
   useEffect(() => {
@@ -159,14 +159,14 @@ export function ImageModal({
   useEffect(() => {
     if (currentImageUrl && imageRef.current) {
       const img = imageRef.current;
+      
       const updateMetadata = () => {
-        // Usar apenas as dimensões naturais da imagem (sem requisições de rede)
         setImageMetadata({
           width: img.naturalWidth,
           height: img.naturalHeight
         });
       };
-      
+
       if (img.complete) {
         updateMetadata();
       } else {
@@ -174,12 +174,11 @@ export function ImageModal({
         return () => img.removeEventListener('load', updateMetadata);
       }
     }
-  }, [currentImageUrl]);
+  }, [currentImageUrl, imageRef]);
 
   const handlePreviousImage = useCallback(() => {
     if (allImages.length <= 1) return;
     
-    // Feedback visual para swipe
     if (isTouchDevice) {
       setSwipeDirection('right');
       setTimeout(() => setSwipeDirection(null), 300);
@@ -197,7 +196,6 @@ export function ImageModal({
   const handleNextImage = useCallback(() => {
     if (allImages.length <= 1) return;
     
-    // Feedback visual para swipe
     if (isTouchDevice) {
       setSwipeDirection('left');
       setTimeout(() => setSwipeDirection(null), 300);
@@ -246,7 +244,6 @@ export function ImageModal({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Erro ao baixar imagem:', error);
-      // Fallback: abrir imagem em nova aba
       window.open(currentImageUrl, '_blank');
     }
   }, [currentImageUrl, currentImageName, currentImageIndex]);
@@ -256,7 +253,6 @@ export function ImageModal({
       setImageError(false);
       setRetryCount(prev => prev + 1);
       setLoadingState(true);
-      
       loadImage(currentImageUrl)
         .then(() => {
           setLoadingState(false);
@@ -268,7 +264,6 @@ export function ImageModal({
     }
   }, [currentImageUrl, retryCount, loadImage, setLoadingState]);
 
-  // Configurar atalhos de teclado
   useKeyboardShortcuts({
     onClose: handleClose,
     onZoomIn: handleZoomIn,
@@ -306,314 +301,237 @@ export function ImageModal({
         resetViewer();
       }
     };
-
+    
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [resetViewer]);
+  }, [resetViewer, imageRef]);
 
   if (!isOpen) return null;
 
   return (
     <div 
-      className="fixed inset-0 bg-black z-50 overflow-hidden"
+      className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="image-modal-title"
       aria-describedby="image-modal-description"
     >
-      
-      <h1 id="image-modal-title" className="sr-only">
+      <div className="sr-only" id="image-modal-title">
         Visualizador de Imagem - {currentImageName}
-      </h1>
-      <div id="image-modal-description" className="sr-only">
+      </div>
+      <div className="sr-only" id="image-modal-description">
         Imagem {currentImageIndex + 1} de {totalPhotos}. Use as setas do teclado para navegar, ESC para fechar, + e - para zoom.
       </div>
 
-      <div className="relative w-full h-full flex flex-col">
-        
-        <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 z-[60]">
-          
-          <div className="hidden sm:flex p-4 justify-between items-center">
-            <div className="flex items-center space-x-2">
+      {/* Barra de ferramentas superior - Desktop */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black to-transparent p-4 hidden md:block">
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <h2 className="text-white text-lg font-semibold truncate max-w-md">
+              {currentImageName}
+            </h2>
+            <span className="text-white text-opacity-80 text-sm">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            {allImages.length > 1 && (
               <button
-                onClick={handleZoomOut}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Diminuir zoom (-)"
-                aria-label="Diminuir zoom"
+                onClick={() => setShowThumbnails(!showThumbnails)}
+                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+                title="Mostrar miniaturas"
               >
-                <ZoomOut className="w-5 h-5 text-white" />
+                <CheckCircle className="w-5 h-5 text-white" />
               </button>
-              <span className="text-white text-sm font-medium min-w-[60px] text-center">
-                {Math.round(zoomLevel * 100)}%
-              </span>
-              <button
-                onClick={handleZoomIn}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Aumentar zoom (+)"
-                aria-label="Aumentar zoom"
-              >
-                <ZoomIn className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={resetZoom}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                title="Resetar zoom (R)"
-                aria-label="Resetar zoom e posição da imagem"
-              >
-                <RotateCcw className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={fitToScreen}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                title="Ajustar à tela (Espaço)"
-                aria-label="Ajustar imagem ao tamanho da tela"
-              >
-                <Maximize2 className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={rotateLeft}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                title="Rotacionar esquerda (Q)"
-                aria-label="Rotacionar imagem 90 graus para esquerda"
-              >
-                <RotateCcw className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={rotateRight}
-                className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                title="Rotacionar direita (E)"
-                aria-label="Rotacionar imagem 90 graus para direita"
-              >
-                <RotateCw className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={handleDownloadImage}
-                className="p-2 bg-green-600 hover:bg-green-700 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-green-400 shadow-lg"
-                title="Baixar imagem (D)"
-                aria-label="Fazer download da imagem atual"
-              >
-                <Download className="w-5 h-5 text-white" />
-              </button>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {allImages.length > 1 && (
-                <button
-                  onClick={() => setShowThumbnails(!showThumbnails)}
-                  className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
-                  title="Mostrar miniaturas"
-                >
-                  <div className="w-5 h-5 grid grid-cols-2 gap-0.5">
-                    <div className="bg-white rounded-sm"></div>
-                    <div className="bg-white rounded-sm"></div>
-                    <div className="bg-white rounded-sm"></div>
-                    <div className="bg-white rounded-sm"></div>
-                  </div>
-                </button>
-              )}
-              
-              <span className="text-white text-sm">
-                {currentImageIndex + 1} de {allImages.length}
-              </span>
-              <button
-                onClick={handleClose}
-                className="p-2 bg-red-600 hover:bg-red-700 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-red-400 shadow-lg border-2 border-red-500"
-                title="Fechar (ESC)"
-                aria-label="Fechar visualizador de imagem"
-              >
-                <X className="w-5 h-5 text-white font-bold" />
-              </button>
+            )}
           </div>
-        
-        </div>
 
-          
-          <div className="sm:hidden p-2 space-y-2">
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={handleZoomOut}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Diminuir zoom (-)"
-                  aria-label="Diminuir zoom"
-                >
-                  <ZoomOut className="w-4 h-4 text-white" />
-                </button>
-                <span className="text-white text-xs font-medium min-w-[45px] text-center">
-                  {Math.round(zoomLevel * 100)}%
-                </span>
-                <button
-                  onClick={handleZoomIn}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Aumentar zoom (+)"
-                  aria-label="Aumentar zoom"
-                >
-                  <ZoomIn className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={resetZoom}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  title="Resetar zoom (R)"
-                  aria-label="Resetar zoom e posição da imagem"
-                >
-                  <RotateCcw className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={fitToScreen}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  title="Ajustar à tela (Espaço)"
-                  aria-label="Ajustar imagem ao tamanho da tela"
-                >
-                  <Maximize2 className="w-4 h-4 text-white" />
-                </button>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <span className="text-white text-xs">
-                  {currentImageIndex + 1}/{allImages.length}
-                </span>
-                <button
-                  onClick={handleClose}
-                  className="p-1.5 bg-red-600 hover:bg-red-700 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-red-400 shadow-lg border border-red-500"
-                  title="Fechar (ESC)"
-                  aria-label="Fechar visualizador de imagem"
-                >
-                  <X className="w-4 h-4 text-white font-bold" />
-                </button>
-              </div>
-        
-            
-
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={rotateLeft}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  title="Rotacionar esquerda (Q)"
-                  aria-label="Rotacionar imagem 90 graus para esquerda"
-                >
-                  <RotateCcw className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={rotateRight}
-                  className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  title="Rotacionar direita (E)"
-                  aria-label="Rotacionar imagem 90 graus para direita"
-                >
-                  <RotateCw className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={handleDownloadImage}
-                  className="p-1.5 bg-green-600 hover:bg-green-700 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-green-400 shadow-lg"
-                  title="Baixar imagem (D)"
-                  aria-label="Fazer download da imagem atual"
-                >
-                  <Download className="w-4 h-4 text-white" />
-                </button>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                {allImages.length > 1 && (
-                  <button
-                    onClick={() => setShowThumbnails(!showThumbnails)}
-                    className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
-                    title="Mostrar miniaturas"
-                  >
-                    <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
-                      <div className="bg-white rounded-sm"></div>
-                      <div className="bg-white rounded-sm"></div>
-                      <div className="bg-white rounded-sm"></div>
-                      <div className="bg-white rounded-sm"></div>
-                    </div>
-                  </button>
-                )}
-                
-              </div>
-            </div>
-          </div>
-        </div>
-
-        
-        {hasMultiplePhotos && (
-          <>
+          <div className="flex items-center gap-2">
             <button
-              onClick={handlePreviousImage}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 hover:bg-opacity-70 transition-all z-[50] touch-manipulation h-16 w-12 flex items-center justify-center"
-              title="Foto anterior"
+              onClick={handleZoomOut}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Diminuir zoom (tecla -)"
+              aria-label="Diminuir zoom"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ZoomOut className="w-5 h-5 text-white" />
             </button>
             <button
-              onClick={handleNextImage}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 hover:bg-opacity-70 transition-all z-[50] touch-manipulation h-16 w-12 flex items-center justify-center"
-              title="Próxima foto"
+              onClick={handleZoomIn}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Aumentar zoom (tecla +)"
+              aria-label="Aumentar zoom"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ZoomIn className="w-5 h-5 text-white" />
             </button>
-          </>
+            <button
+              onClick={resetViewer}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Resetar zoom e rotação (tecla R)"
+              aria-label="Resetar visualização"
+            >
+              <RotateCcw className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={fitToScreen}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Ajustar à tela (tecla F)"
+              aria-label="Ajustar à tela"
+            >
+              <Maximize2 className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={rotateLeft}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Rotacionar à esquerda (tecla [)"
+              aria-label="Rotacionar à esquerda"
+            >
+              <RotateCcw className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={rotateRight}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Rotacionar à direita (tecla ])"
+              aria-label="Rotacionar à direita"
+            >
+              <RotateCw className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={handleDownloadImage}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Baixar imagem (tecla D)"
+              aria-label="Baixar imagem"
+            >
+              <Download className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={handleClose}
+              className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              title="Fechar (tecla ESC)"
+              aria-label="Fechar visualizador"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Barra de ferramentas superior - Mobile */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black to-transparent p-3 md:hidden">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <h2 className="text-white text-sm font-semibold truncate">
+              {currentImageName}
+            </h2>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all flex-shrink-0"
+            aria-label="Fechar visualizador"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de informações inferior - Mobile */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black to-transparent p-3 md:hidden">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-white text-sm">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <span className="text-white text-opacity-80 text-sm">
+              {currentImageIndex + 1}/{allImages.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {allImages.length > 1 && (
+              <button
+                onClick={() => setShowThumbnails(!showThumbnails)}
+                className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+                title="Mostrar miniaturas"
+              >
+                <CheckCircle className="w-4 h-4 text-white" />
+              </button>
+            )}
+            <button
+              onClick={handleDownloadImage}
+              className="p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all"
+              aria-label="Baixar imagem"
+            >
+              <Download className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Botões de navegação - apenas se houver múltiplas fotos */}
+      {hasMultiplePhotos && (
+        <>
+          <button
+            onClick={handlePreviousImage}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+            title="Imagem anterior (seta esquerda)"
+            aria-label="Navegar para imagem anterior"
+          >
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
+          <button
+            onClick={handleNextImage}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+            title="Próxima imagem (seta direita)"
+            aria-label="Navegar para próxima imagem"
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+        </>
+      )}
+
+      {/* Container da imagem */}
+      <div
+        ref={containerRef}
+        className="w-full h-full flex items-center justify-center overflow-hidden cursor-move active:cursor-grabbing"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
+        onDoubleClick={handleDoubleClick}
+        style={{ touchAction: 'none' }}
+      >
+        {(isLoading || isImageLoading(currentImageUrl)) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 text-white animate-spin mx-auto mb-2" />
+              <p className="text-white text-sm">Carregando imagem...</p>
+            </div>
+          </div>
         )}
 
-        
-        <div
-          ref={containerRef}
-          className={`flex-1 flex items-center justify-center overflow-hidden relative transition-all duration-300 ease-in-out ${
-            orientation.isLandscape ? 'landscape-mode' : 'portrait-mode'
-          } ${swipeDirection ? 'animate-pulse' : ''}`}
-          onMouseDown={!isTouchDevice ? handleMouseDown : undefined}
-          onMouseMove={!isTouchDevice ? handleMouseMove : undefined}
-          onMouseUp={!isTouchDevice ? handleMouseUp : undefined}
-          onMouseLeave={!isTouchDevice ? handleMouseUp : undefined}
-          onWheel={!isTouchDevice ? handleWheel : undefined}
-          onTouchStart={isTouchDevice ? handleTouchStart : undefined}
-          onTouchMove={isTouchDevice ? handleTouchMove : undefined}
-          onTouchEnd={isTouchDevice ? handleTouchEnd : undefined}
-          onDoubleClick={!isTouchDevice ? handleDoubleClick : undefined}
-          style={{ 
-            cursor: isDragging ? 'grabbing' : (isTouchDevice ? 'default' : 'grab'),
-            touchAction: 'none'
-          }}
-        >
-          
-          {(isLoading || isImageLoading(currentImageUrl)) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10">
-              <div className="bg-white bg-opacity-90 rounded-lg p-4 flex items-center space-x-3">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                <span className="text-gray-700 font-medium">Carregando imagem...</span>
-              </div>
-            </div>
-          )}
-
-          
-          {imageError && (
-            <div 
-              className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10"
-              role="alert"
-              aria-live="polite"
-            >
-              <div className="bg-white rounded-lg p-6 max-w-md mx-4 text-center">
-                <div className="text-red-500 mb-4">
-                  <X className="w-12 h-12 mx-auto" aria-hidden="true" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Erro ao carregar imagem
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  {retryCount > 0 
-                    ? `Tentativa ${retryCount + 1} de 3 falhou. Verifique sua conexão.`
-                    : 'Não foi possível carregar a imagem. Verifique sua conexão com a internet.'
-                  }
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                  <button
-                    onClick={handleRetryLoad}
-                    disabled={retryCount >= 3}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    aria-label="Tentar carregar a imagem novamente"
-                  >
-                    {retryCount >= 3 ? 'Limite atingido' : `Tentar novamente (${retryCount + 1}/3)`}
-                  </button>
+        {imageError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md text-center">
+              <X className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                Erro ao carregar imagem
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {retryCount > 0 
+                  ? `Tentativa ${retryCount + 1} de 3 falhou. Verifique sua conexão.`
+                  : 'Não foi possível carregar a imagem. Verifique sua conexão com a internet.'
+                }
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleRetryLoad}
+                  disabled={retryCount >= 3}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  aria-label="Tentar carregar a imagem novamente"
+                >
+                  {retryCount >= 3 ? 'Limite atingido' : `Tentar novamente (${retryCount + 1}/3)`}
+                </button>
+                {allImages.length > 1 && (
                   <button
                     onClick={() => {
                       setImageError(false);
@@ -625,73 +543,62 @@ export function ImageModal({
                   >
                     Próxima imagem
                   </button>
-                  <button
-                    onClick={handleClose}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
-                    aria-label="Fechar visualizador de imagem"
-                  >
-                    Fechar
-                  </button>
-                </div>
+                )}
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  aria-label="Fechar visualizador"
+                >
+                  Fechar
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          <img
-            ref={imageRef}
-            src={currentImageUrl}
-            alt={currentImageName || "Documento da conta"}
-            className={`max-w-full max-h-full select-none ${
-              isDragging ? 'transition-none' : 'transition-transform duration-300 ease-out'
-            }`}
-            style={{
-              transform: `scale(${zoomLevel}) translate(${imagePosition.x / zoomLevel}px, ${imagePosition.y / zoomLevel}px) rotate(${rotation}deg)`,
-              transformOrigin: 'center center',
-              willChange: isDragging ? 'transform' : 'auto',
-              objectFit: 'contain',
-              filter: imageError ? 'blur(2px) grayscale(100%)' : 'none',
-              opacity: (isLoading || isImageLoading(currentImageUrl)) ? 0.7 : 1
-            }}
-            draggable={false}
-            onDragStart={(e) => e.preventDefault()}
-            onError={() => setImageError(true)}
-            onLoad={() => {
-              setImageError(false);
-              setLoadingState(false);
-            }}
-          />
+        <img
+          ref={imageRef}
+          src={signedMap[currentImageUrl] || currentImageUrl}
+          alt={currentImageName || `Imagem ${currentImageIndex + 1}`}
+          className="max-w-none select-none pointer-events-none"
+          style={{
+            transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${zoomLevel}) rotate(${rotation}deg)`,
+            transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+            transformOrigin: 'center center'
+          }}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+          onError={() => setImageError(true)}
+          onLoad={() => {
+            setImageError(false);
+            setLoadingState(false);
+          }}
+        />
 
-          
-           {isTouchDevice && swipeDirection && (
-             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-               <div className={`bg-black bg-opacity-70 text-white px-6 py-3 rounded-full flex items-center space-x-2 transform transition-all duration-300 ${
-                 swipeDirection === 'left' 
-                   ? 'animate-bounce translate-x-4' 
-                   : 'animate-bounce -translate-x-4'
-               }`}>
-                 {swipeDirection === 'left' ? (
-                   <>
-                     <ChevronRight className="w-6 h-6 animate-pulse" />
-                     <span className="font-medium">Próxima</span>
-                   </>
-                 ) : (
-                   <>
-                     <ChevronLeft className="w-6 h-6 animate-pulse" />
-                     <span className="font-medium">Anterior</span>
-                   </>
-                 )}
-               </div>
-             </div>
-           )}
-           
-           
-           
-        </div>
+        {isTouchDevice && swipeDirection && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-black bg-opacity-60 text-white px-6 py-3 rounded-full flex items-center gap-2 animate-fade-in-out">
+              {swipeDirection === 'left' ? (
+                <>
+                  <ChevronRight className="w-6 h-6" />
+                  <span>Próxima</span>
+                </>
+              ) : (
+                <>
+                  <ChevronLeft className="w-6 h-6" />
+                  <span>Anterior</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
-        
-        {showThumbnails && allImages.length > 1 && (
-          <div className="absolute bottom-20 left-0 right-0 bg-black bg-opacity-70 p-4 z-[60]">
-            <div className="flex justify-center space-x-2 overflow-x-auto max-w-full">
+      {/* Painel de miniaturas */}
+      {showThumbnails && allImages.length > 1 && (
+        <div className="absolute bottom-20 md:bottom-4 left-0 right-0 z-20 px-4">
+          <div className="bg-black bg-opacity-80 rounded-lg p-4 max-w-4xl mx-auto">
+            <div className="flex gap-3 overflow-x-auto pb-2">
               {allImages.map((image, index) => (
                 <button
                   key={index}
@@ -707,20 +614,15 @@ export function ImageModal({
                 >
                   <img
                     src={signedMap[image.url] || image.url}
-                    alt={image.name}
+                    alt={`Miniatura ${index + 1}`}
                     className="w-full h-full object-cover"
-                    loading="lazy"
                   />
                 </button>
               ))}
             </div>
           </div>
-        )}
-
-        
-        
-        
-      </div>
+        </div>
+      )}
     </div>
   );
 }
