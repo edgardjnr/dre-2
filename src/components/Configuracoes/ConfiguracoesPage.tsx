@@ -41,15 +41,16 @@ export const ConfiguracoesPage: React.FC = () => {
     
     try {
       const { data, error } = await supabase
-        .from('empresas')
-        .select('id, razaoSocial:razao_social')
-        .eq('user_id', user.id);
+        .rpc('get_user_companies');
       
       console.log('Resultado da busca de empresas:', { data, error });
       
       if (error) throw error;
       
-      setEmpresas(data || []);
+      setEmpresas((data || []).map((row: any) => ({
+        id: row.id,
+        razaoSocial: row.razao_social
+      })));
       if (data && data.length > 0) {
         setSelectedEmpresa(data[0].id);
         console.log('Empresa selecionada automaticamente:', data[0]);

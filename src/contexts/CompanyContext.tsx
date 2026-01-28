@@ -52,17 +52,16 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       });
       
       const companiesPromise = supabase
-        .from('empresas')
-        .select('id, razaoSocial:razao_social')
-        .eq('user_id', user.id)
-        .eq('ativa', true)
-        .order('razao_social');
+        .rpc('get_user_companies');
       
       const { data, error } = await Promise.race([companiesPromise, timeoutPromise]);
 
       if (error) throw error;
 
-      setCompanies(data || []);
+      setCompanies((data || []).map((row: any) => ({
+        id: row.id,
+        razaoSocial: row.razao_social
+      })));
       
       // Auto-selecionar a primeira empresa se não houver uma selecionada
       if (data && data.length > 0 && !selectedCompany) {
