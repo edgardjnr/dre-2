@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Crown, UserPlus, Users, Trash2, Shield, Eye, UserCheck, Zap } from 'lucide-react';
+import { Settings, UserPlus, Users, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { CollaboratorsService } from '../../services/collaboratorsService';
 import type { CompanyCollaborator, CollaboratorRole } from '../../types/collaborators';
@@ -13,12 +13,10 @@ export const ConfiguracoesPage: React.FC = () => {
   const [selectedEmpresa, setSelectedEmpresa] = useState('');
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<CollaboratorRole>('member');
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [collaborators, setCollaborators] = useState<CompanyCollaborator[]>([]);
   const [lastInviteLink, setLastInviteLink] = useState<string>('');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<CollaboratorRole | null>(null);
 
   useEffect(() => {
     fetchEmpresas();
@@ -70,10 +68,6 @@ export const ConfiguracoesPage: React.FC = () => {
       setLoadingAction('collaborators');
       const data = await CollaboratorsService.getCompanyCollaborators(selectedEmpresa);
       setCollaborators(data);
-      
-      // Encontrar o papel do usuário atual
-      const currentUser = data.find(collaborator => collaborator.user_id === user?.id);
-      setCurrentUserRole(currentUser?.role || null);
     } catch (error) {
       console.error('Erro ao carregar colaboradores:', error);
     } finally {
@@ -155,116 +149,11 @@ export const ConfiguracoesPage: React.FC = () => {
 
   // Cancelamento de convites removido do sistema
 
-  // Função para verificar se o usuário pode alterar para um papel específico
-  const canPromoteToRole = (targetRole: CollaboratorRole): boolean => {
-    if (!currentUserRole) return false;
-    
-    // Master pode fazer qualquer alteração
-    if (currentUserRole === 'master') return true;
-    
-    // Ninguém pode se tornar master, exceto outros masters
-    if (targetRole === 'master') return false;
-    
-    // Admin não pode promover para admin ou master
-    if (currentUserRole === 'admin' && (targetRole === 'admin' || targetRole === 'master')) {
-      return false;
-    }
-    
-    // Owner pode alterar qualquer papel exceto master
-    if (currentUserRole === 'owner' && targetRole !== 'master') return true;
-    
-    // Admin pode alterar apenas para member e viewer
-    if (currentUserRole === 'admin' && (targetRole === 'member' || targetRole === 'viewer')) {
-      return true;
-    }
-    
-    return false;
-  };
-
-  const updateCollaboratorRole = async (collaboratorId: string, newRole: CollaboratorRole) => {
-    // Verificar permissões antes de tentar alterar
-    if (!canPromoteToRole(newRole)) {
-      let message = 'Você não tem permissão para alterar para este papel.';
-      
-      if (newRole === 'master') {
-        message = 'Apenas usuários Master podem promover outros usuários para Master.';
-      } else if (currentUserRole === 'admin' && (newRole === 'admin' || newRole === 'master')) {
-        message = 'Administradores não podem promover usuários para Administrador ou Master.';
-      }
-      
-      alert(message);
-      return;
-    }
-    
-    try {
-      setLoadingAction(`updating-${collaboratorId}`);
-      await CollaboratorsService.updateCollaboratorRole(collaboratorId, newRole);
-      fetchCollaborators();
-      alert('Função do colaborador atualizada com sucesso!');
-    } catch (error: any) {
-      console.error('Erro ao atualizar função:', error);
-      alert(`Erro ao atualizar função: ${error.message}`);
-    } finally {
-      setLoadingAction(null);
-    }
-  };
-
-
-
-  const getRoleDisplayName = (role: CollaboratorRole) => {
-    const roleNames = {
-      owner: 'Proprietário',
-      admin: 'Administrador',
-      member: 'Membro',
-      viewer: 'Visualizador',
-      master: 'Master'
-    };
-    return roleNames[role] || role;
-  };
-
-  const getRoleIcon = (role: CollaboratorRole) => {
-    switch (role) {
-      case 'owner':
-        return Crown;
-      case 'admin':
-        return Shield;
-      case 'member':
-        return UserCheck;
-      case 'viewer':
-        return Eye;
-      case 'master':
-        return Zap;
-      default:
-        return UserCheck;
-    }
-  };
-
-  const getRoleDescription = (role: CollaboratorRole) => {
-    switch (role) {
-      case 'owner':
-        return 'Acesso total e controle da empresa';
-      case 'admin':
-        return 'Gerenciar usuários e configurações';
-      case 'member':
-        return 'Acesso completo às funcionalidades';
-      case 'viewer':
-        return 'Apenas visualização de dados';
-      case 'master':
-        return 'Controle supremo sobre todo o sistema';
-      default:
-        return 'Acesso completo às funcionalidades';
-    }
-  };
-
-  const getRoleBadgeColor = (role: CollaboratorRole) => {
-    const colors = {
-      owner: 'bg-purple-100 text-purple-800',
-      admin: 'bg-red-100 text-red-800',
-      member: 'bg-blue-100 text-blue-800',
-      viewer: 'bg-gray-100 text-gray-800',
-      master: 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-    };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+  const formatMemberSince = (value?: string) => {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('pt-BR');
   };
 
   if (loading) {
@@ -339,54 +228,20 @@ export const ConfiguracoesPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">
-                          {collaborator.user?.user_metadata?.full_name || collaborator.user?.email || 'Usuário'}
+                          {collaborator.user?.user_metadata?.full_name || collaborator.user?.email || collaborator.user_id || 'Usuário'}
                         </p>
-                        <p className="text-sm text-gray-500">{collaborator.user?.email}</p>
+                        {collaborator.user?.email && (
+                          <p className="text-sm text-gray-500">{collaborator.user.email}</p>
+                        )}
                         <p className="text-xs text-gray-400">
-                          Membro desde {new Date(collaborator.joined_at).toLocaleDateString('pt-BR')}
+                          Membro desde {formatMemberSince(collaborator.joined_at || collaborator.created_at)}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span 
-                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(collaborator.role)} cursor-help`}
-                        title={getRoleDescription(collaborator.role)}
-                      >
-                        {React.createElement(getRoleIcon(collaborator.role), { className: 'w-3 h-3' })}
-                        {getRoleDisplayName(collaborator.role)}
+                      <span className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Usuário
                       </span>
-                      {collaborator.role !== 'owner' && collaborator.role !== 'master' && (
-                        <div className="relative">
-                          <select
-                            value={collaborator.role}
-                            onChange={(e) => updateCollaboratorRole(collaborator.id, e.target.value as CollaboratorRole)}
-                            className="appearance-none bg-white border border-gray-300 rounded-md px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={loadingAction === `updating-${collaborator.id}`}
-                          >
-                            {/* Master - apenas masters podem atribuir */}
-                            {canPromoteToRole('master') && (
-                              <option value="master">⚡ Master</option>
-                            )}
-                            {/* Admin - masters e owners podem atribuir */}
-                            {canPromoteToRole('admin') && (
-                              <option value="admin">🛡️ Administrador</option>
-                            )}
-                            {/* Member - todos exceto viewers podem atribuir */}
-                            {canPromoteToRole('member') && (
-                              <option value="member">✅ Membro</option>
-                            )}
-                            {/* Viewer - todos podem atribuir */}
-                            {canPromoteToRole('viewer') && (
-                              <option value="viewer">👁️ Visualizador</option>
-                            )}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
                       {collaborator.role !== 'owner' && collaborator.role !== 'master' && (
                         <button
                           onClick={() => removeCollaborator(collaborator.id)}
@@ -443,7 +298,6 @@ export const ConfiguracoesPage: React.FC = () => {
                 onClick={() => {
                   setShowInviteForm(false);
                   setInviteEmail('');
-                  setInviteRole('member');
                 }}
                 className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
                 disabled={loadingAction === 'creating-user'}
