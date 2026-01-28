@@ -5,6 +5,7 @@ import { useImageCache } from '../hooks/useImageCache';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useMobileGestures, useOrientation } from '../hooks/useMobileGestures';
 import { ContaPagar } from '../../../types';
+import { supabase } from '../../../lib/supabaseClient';
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -59,6 +60,33 @@ export function ImageModal({
     
     return images;
   }, [conta.fotos, conta.fotoUrl, conta.fotoNome]);
+  
+  const [signedMap, setSignedMap] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    const genSigned = async () => {
+      const urls = allImages.map(i => i.url);
+      const entries: [string, string][] = [];
+      for (const url of urls) {
+        const m = url.match(/\/contas-fotos\/(.+)$/);
+        const key = m?.[1];
+        if (key) {
+          const { data, error } = await supabase.storage.from('contas-fotos').createSignedUrl(key, 60 * 60 * 24 * 7);
+          if (!error && data?.signedUrl) {
+            entries.push([url, data.signedUrl]);
+          }
+        }
+      }
+      if (entries.length) {
+        setSignedMap(prev => {
+          const next = { ...prev };
+          for (const [orig, signed] of entries) next[orig] = signed;
+          return next;
+        });
+      }
+    };
+    genSigned();
+  }, [allImages]);
   
   const hasMultiplePhotos = allImages.length > 1;
   const totalPhotos = allImages.length;
@@ -159,12 +187,12 @@ export function ImageModal({
     
     const newIndex = currentImageIndex > 0 ? currentImageIndex - 1 : allImages.length - 1;
     setCurrentImageIndex(newIndex);
-    setCurrentImageUrl(allImages[newIndex].url);
+    setCurrentImageUrl(signedMap[allImages[newIndex].url] || allImages[newIndex].url);
     setCurrentImageName(allImages[newIndex].name);
     setImageError(false);
     setRetryCount(0);
     resetViewer();
-  }, [allImages, currentImageIndex, resetViewer, isTouchDevice]);
+  }, [allImages, currentImageIndex, resetViewer, isTouchDevice, signedMap]);
 
   const handleNextImage = useCallback(() => {
     if (allImages.length <= 1) return;
@@ -177,24 +205,24 @@ export function ImageModal({
     
     const newIndex = currentImageIndex < allImages.length - 1 ? currentImageIndex + 1 : 0;
     setCurrentImageIndex(newIndex);
-    setCurrentImageUrl(allImages[newIndex].url);
+    setCurrentImageUrl(signedMap[allImages[newIndex].url] || allImages[newIndex].url);
     setCurrentImageName(allImages[newIndex].name);
     setImageError(false);
     setRetryCount(0);
     resetViewer();
-  }, [allImages, currentImageIndex, resetViewer, isTouchDevice]);
+  }, [allImages, currentImageIndex, resetViewer, isTouchDevice, signedMap]);
 
   const handleGoToImage = useCallback((index: number) => {
     if (index < 0 || index >= allImages.length) return;
     
     setCurrentImageIndex(index);
-    setCurrentImageUrl(allImages[index].url);
+    setCurrentImageUrl(signedMap[allImages[index].url] || allImages[index].url);
     setCurrentImageName(allImages[index].name);
     setImageError(false);
     setRetryCount(0);
     setShowThumbnails(false);
     resetViewer();
-  }, [allImages, resetViewer]);
+  }, [allImages, resetViewer, signedMap]);
 
   const handleClose = useCallback(() => {
     resetViewer();
@@ -774,7 +802,7 @@ export function ImageModal({
                   aria-current={index === currentImageIndex ? 'true' : 'false'}
                 >
                   <img
-                    src={image.url}
+                    src={signedMap[image.url] || image.url}
                     alt={image.name}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -814,11 +842,10 @@ export function ImageModal({
               </div>
               <div>
                 <span className="text-gray-300">Vencimento:</span>
-                <p className="font-medium">{new Date(conta.vencimento).toLocaleDateString('pt-BR')}</p>
+                <p className="font-medium">{new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
           </div>
-        )}
 
         {/* Informações do arquivo no rodapé */}
         <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-4 z-[60]">
@@ -826,11 +853,11 @@ export function ImageModal({
             <div className="text-white">
               <p className="text-sm font-medium">{currentImageName}</p>
               <p className="text-xs opacity-75">
-                Fornecedor: {conta.fornecedor} | Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
+                Fornecedor: {conta.fornecedor} | Vencimento: {new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}
               </p>
             </div>
             
-            {conta.status === 'PAGO' && (
+            {conta.status === 'paga' && (
               <div className="flex items-center space-x-2 text-green-400">
                 <CheckCircle className="w-5 h-5" />
                 <span className="text-sm font-medium">Conta Paga</span>
