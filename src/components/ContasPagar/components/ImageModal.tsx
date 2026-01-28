@@ -283,7 +283,6 @@ export function ImageModal({
     enabled: isOpen
   });
 
-  // Configurar gestos mobile
   const { hapticFeedback } = useMobileGestures({
     onSwipeLeft: handleNextImage,
     onSwipeRight: handlePreviousImage,
@@ -299,15 +298,11 @@ export function ImageModal({
     swipeThreshold: 80
   });
 
-  // Detectar orientação
   const orientation = useOrientation();
 
-  // Recalcular tamanho da imagem quando a janela for redimensionada
   useEffect(() => {
     const handleResize = () => {
       if (imageRef.current) {
-        // A imagem já está configurada para ocupar toda a tela via CSS
-        // Apenas força um re-render se necessário
         resetViewer();
       }
     };
@@ -593,7 +588,7 @@ export function ImageModal({
           onDoubleClick={!isTouchDevice ? handleDoubleClick : undefined}
           style={{ 
             cursor: isDragging ? 'grabbing' : (isTouchDevice ? 'default' : 'grab'),
-            touchAction: 'none' // Previne scroll nativo em dispositivos touch
+            touchAction: 'none'
           }}
         >
           
