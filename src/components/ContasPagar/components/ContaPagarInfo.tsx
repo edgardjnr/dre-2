@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Building, FileText, DollarSign, Calendar, Hash, Copy, Check, Image } from 'lucide-react';
 import { ContaPagar, ContaContabil } from '../../../types';
+import { supabase } from '../../../lib/supabaseClient';
 
 // Função para formatar data para exibição sem problemas de timezone
 const formatDateForDisplay = (dateString: string): Date => {
@@ -85,6 +86,37 @@ interface ContaPagarInfoProps {
 
 export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }: ContaPagarInfoProps) {
   const [copiado, setCopiado] = useState(false);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const generateSigned = async () => {
+      const urls: string[] = [];
+      if (conta.fotoUrl) urls.push(conta.fotoUrl);
+      if (conta.fotos && conta.fotos.length > 0) {
+        urls.push(...conta.fotos.map(f => f.fotoUrl));
+      }
+      const entries: [string, string][] = [];
+      for (const url of urls) {
+        const m = url.match(/\/contas-fotos\/(.+)$/);
+        const key = m?.[1];
+        if (key) {
+          const { data, error } = await supabase.storage.from('contas-fotos').createSignedUrl(key, 60 * 60 * 24 * 7);
+          if (!error && data?.signedUrl) {
+            entries.push([url, data.signedUrl]);
+          }
+        }
+      }
+      if (entries.length > 0) {
+        setSignedUrls(prev => {
+          const next = { ...prev };
+          for (const [orig, signed] of entries) next[orig] = signed;
+          return next;
+        });
+      }
+    };
+    generateSigned();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conta.fotoUrl, conta.fotos?.length]);
 
   const getContaContabilNome = (contaContabilId: string | null) => {
     if (!contaContabilId) return 'Não definida';
@@ -219,13 +251,12 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
                   <div key={foto.id} className="flex items-center space-x-3">
                     <button
                       onClick={() => {
-                        console.log('DEBUG - Clicking on foto:', { url: foto.fotoUrl, name: foto.fotoNome });
-                        onImageClick(foto.fotoUrl, foto.fotoNome);
+                      onImageClick(signedUrls[foto.fotoUrl] || foto.fotoUrl, foto.fotoNome);
                       }}
                       className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden hover:bg-gray-200 transition-colors"
                     >
                       <img
-                        src={foto.fotoUrl}
+                      src={signedUrls[foto.fotoUrl] || foto.fotoUrl}
                         alt={`Documento ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -235,7 +266,7 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
                         {foto.fotoNome}
                       </p>
                       <button
-                        onClick={() => onImageClick(foto.fotoUrl, foto.fotoNome)}
+                      onClick={() => onImageClick(signedUrls[foto.fotoUrl] || foto.fotoUrl, foto.fotoNome)}
                         className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
                       >
                         Visualizar
@@ -259,13 +290,12 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => {
-                      console.log('DEBUG - Clicking on comprovante:', { url: conta.fotoUrl, name: conta.fotoNome || 'Comprovante de Pagamento' });
-                      onImageClick(conta.fotoUrl!, conta.fotoNome || 'Comprovante de Pagamento');
+                      onImageClick(signedUrls[conta.fotoUrl!] || conta.fotoUrl!, conta.fotoNome || 'Comprovante de Pagamento');
                     }}
                     className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden hover:bg-gray-200 transition-colors"
                   >
                     <img
-                      src={conta.fotoUrl}
+                      src={signedUrls[conta.fotoUrl!] || conta.fotoUrl!}
                       alt="Comprovante de Pagamento"
                       className="w-full h-full object-cover"
                     />
@@ -275,7 +305,7 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
                       {conta.fotoNome || 'Comprovante de Pagamento'}
                     </p>
                     <button
-                      onClick={() => onImageClick(conta.fotoUrl!, conta.fotoNome || 'Comprovante de Pagamento')}
+                      onClick={() => onImageClick(signedUrls[conta.fotoUrl!] || conta.fotoUrl!, conta.fotoNome || 'Comprovante de Pagamento')}
                       className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
                     >
                       Visualizar Comprovante
