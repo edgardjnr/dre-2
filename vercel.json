@@ -1,6 +1,10 @@
 {
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/sw\\.js", "dest": "/sw.js" },
+    { "src": "/favicon\\.ico", "dest": "/favicon.ico" },
+    { "src": "/manifest\\.json", "dest": "/manifest.json" },
+    { "src": "/(?!assets/|sw\\.js|favicon\\.ico|manifest\\.json).*$", "dest": "/index.html" }
   ]
 }
