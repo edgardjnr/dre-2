@@ -65,14 +65,15 @@ export class CollaboratorsService {
       const userIds = rows.map(r => r.user_id).filter(Boolean);
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url, email')
         .in('id', userIds);
-      const profilesById = new Map<string, { full_name: string | null; avatar_url: string | null }>();
-      (profilesData || []).forEach((p: any) => profilesById.set(p.id, { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null }));
+      const profilesById = new Map<string, { full_name: string | null; avatar_url: string | null; email: string | null }>();
+      (profilesData || []).forEach((p: any) => profilesById.set(p.id, { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null, email: p.email ?? null }));
 
       return rows.map((row: any) => {
         const profile = profilesById.get(row.user_id);
-        const fullName = profile?.full_name || 'Usuário';
+        const fullName = profile?.full_name || '';
+        const email = profile?.email || '';
         return {
         id: row.id,
         company_id: row.company_id,
@@ -84,7 +85,7 @@ export class CollaboratorsService {
         updated_at: row.updated_at || row.created_at,
         user: {
           id: row.user_id,
-          email: '',
+          email,
           user_metadata: {
             full_name: fullName,
             avatar_url: profile?.avatar_url ?? undefined

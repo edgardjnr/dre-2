@@ -228,10 +228,10 @@ export const ConfiguracoesPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">
-                          {collaborator.user?.user_metadata?.full_name || collaborator.user?.email || 'Usuário'}
+                          {collaborator.user?.email || 'Sem email'}
                         </p>
-                        {collaborator.user?.email && (
-                          <p className="text-sm text-gray-500">{collaborator.user.email}</p>
+                        {collaborator.user?.user_metadata?.full_name && (
+                          <p className="text-sm text-gray-500">{collaborator.user.user_metadata.full_name}</p>
                         )}
                         <p className="text-xs text-gray-400">
                           Membro desde {formatMemberSince(collaborator.joined_at || collaborator.created_at)}
