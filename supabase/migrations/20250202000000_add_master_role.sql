@@ -57,8 +57,9 @@ CREATE POLICY "Company owners and masters can manage invitations" ON public.comp
         )
     );
 
--- Update the update_collaborator_role function to allow masters to change any role
-CREATE OR REPLACE FUNCTION update_collaborator_role(
+-- Remover versão anterior para evitar conflito de assinatura/retorno
+DROP FUNCTION IF EXISTS public.update_collaborator_role(uuid, text);
+CREATE OR REPLACE FUNCTION public.update_collaborator_role(
   p_collaborator_id uuid,
   p_new_role text
 )
