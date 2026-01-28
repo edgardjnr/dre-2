@@ -52,6 +52,7 @@ export const ContasPagarList: React.FC = () => {
 
   const [filtroStatus, setFiltroStatus] = useState('');
   const [termoPesquisa, setTermoPesquisa] = useState('');
+  const [debouncedTermoPesquisa, setDebouncedTermoPesquisa] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   
@@ -114,10 +115,17 @@ export const ContasPagarList: React.FC = () => {
     return d ? format(d, pattern) : '-';
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTermoPesquisa(termoPesquisa);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [termoPesquisa]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setServerSearching(!!termoPesquisa && termoPesquisa.trim().length >= 2);
+    setServerSearching(!!debouncedTermoPesquisa && debouncedTermoPesquisa.trim().length >= 2);
     try {
       const baseQuery = supabase.from('contas_a_pagar').select(`
           id,
@@ -146,7 +154,7 @@ export const ContasPagarList: React.FC = () => {
           )
         `, { count: 'exact' });
 
-      const term = (termoPesquisa || '').trim();
+      const term = (debouncedTermoPesquisa || '').trim();
       const contasQuery = term.length >= 2
         ? baseQuery.or(
             `fornecedor.ilike.%${term}%,descricao.ilike.%${term}%,numero_documento.ilike.%${term}%,observacoes.ilike.%${term}%`
@@ -236,7 +244,7 @@ export const ContasPagarList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchLimit, termoPesquisa]);
+  }, [fetchLimit, debouncedTermoPesquisa]);
 
   useEffect(() => {
     fetchData();
@@ -800,8 +808,8 @@ export const ContasPagarList: React.FC = () => {
     }
     
     // Filtro de pesquisa por texto
-    if (termoPesquisa && !serverSearching) {
-      const termo = termoPesquisa.toLowerCase();
+  if (debouncedTermoPesquisa && !serverSearching) {
+      const termo = debouncedTermoPesquisa.toLowerCase();
       const fornecedor = conta.fornecedor?.toLowerCase() || '';
       const descricao = conta.descricao?.toLowerCase() || '';
       const valor = conta.valor.toString();
