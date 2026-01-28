@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, ZoomIn, ZoomOut, RotateCcw, CheckCircle, ChevronLeft, ChevronRight, RotateCw, Maximize2, Loader2, Info, Download } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, RotateCcw, CheckCircle, ChevronLeft, ChevronRight, RotateCw, Maximize2, Loader2, Download } from 'lucide-react';
 import { useImageViewer } from '../hooks/useImageViewer';
 import { useImageCache } from '../hooks/useImageCache';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -33,7 +33,7 @@ export function ImageModal({
   const [retryCount, setRetryCount] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [imageMetadata, setImageMetadata] = useState<{width: number, height: number, size?: number, lastModified?: number} | null>(null);
-  const [showImageInfo, setShowImageInfo] = useState(false);
+  
 
   // Criar array combinado de todas as imagens
   const allImages = React.useMemo(() => {
@@ -411,16 +411,7 @@ export function ImageModal({
                   </div>
                 </button>
               )}
-              <button
-                onClick={() => setShowImageInfo(!showImageInfo)}
-                className={`p-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 ${
-                  showImageInfo ? 'bg-opacity-40' : ''
-                }`}
-                title="Informações da imagem (I)"
-                aria-label="Mostrar informações detalhadas da imagem"
-              >
-                <Info className="w-5 h-5 text-white" />
-              </button>
+              
               <span className="text-white text-sm">
                 {currentImageIndex + 1} de {allImages.length}
               </span>
@@ -538,16 +529,7 @@ export function ImageModal({
                     </div>
                   </button>
                 )}
-                <button
-                  onClick={() => setShowImageInfo(!showImageInfo)}
-                  className={`p-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 ${
-                    showImageInfo ? 'bg-opacity-40' : ''
-                  }`}
-                  title="Informações da imagem (I)"
-                  aria-label="Mostrar informações detalhadas da imagem"
-                >
-                  <Info className="w-4 h-4 text-white" />
-                </button>
+                
               </div>
             </div>
           </div>
@@ -703,82 +685,7 @@ export function ImageModal({
            )}
            
            
-           {showImageInfo && imageMetadata && (
-             <div className="absolute top-20 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg max-w-xs z-[60] backdrop-blur-sm">
-               <div className="flex items-center justify-between mb-3">
-                 <h3 className="text-lg font-semibold flex items-center">
-                   <Info className="w-5 h-5 mr-2" />
-                   Informações
-                 </h3>
-                 <button
-                   onClick={() => setShowImageInfo(false)}
-                   className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
-                   aria-label="Fechar informações"
-                 >
-                   <X className="w-4 h-4" />
-                 </button>
-               </div>
-               
-               <div className="space-y-2 text-sm">
-                 <div className="flex justify-between">
-                   <span className="text-gray-300">Nome:</span>
-                   <span className="font-medium truncate ml-2" title={currentImageName}>
-                     {currentImageName || 'Sem nome'}
-                   </span>
-                 </div>
-                 
-                 <div className="flex justify-between">
-                   <span className="text-gray-300">Dimensões:</span>
-                   <span className="font-medium">
-                     {imageMetadata.width} × {imageMetadata.height}px
-                   </span>
-                 </div>
-                 
-                 {imageMetadata.size && (
-                   <div className="flex justify-between">
-                     <span className="text-gray-300">Tamanho:</span>
-                     <span className="font-medium">
-                       {(imageMetadata.size / 1024 / 1024).toFixed(2)} MB
-                     </span>
-                   </div>
-                 )}
-                 
-                 <div className="flex justify-between">
-                   <span className="text-gray-300">Zoom:</span>
-                   <span className="font-medium">{Math.round(zoomLevel * 100)}%</span>
-                 </div>
-                 
-                 <div className="flex justify-between">
-                   <span className="text-gray-300">Rotação:</span>
-                   <span className="font-medium">{rotation}°</span>
-                 </div>
-                 
-                 {imageMetadata.lastModified && (
-                   <div className="flex justify-between">
-                     <span className="text-gray-300">Modificado:</span>
-                     <span className="font-medium text-xs">
-                       {new Date(imageMetadata.lastModified).toLocaleDateString('pt-BR', {
-                         day: '2-digit',
-                         month: '2-digit',
-                         year: 'numeric',
-                         hour: '2-digit',
-                         minute: '2-digit'
-                       })}
-                     </span>
-                   </div>
-                 )}
-                 
-                 <div className="border-t border-gray-600 pt-2 mt-3">
-                   <div className="flex justify-between">
-                     <span className="text-gray-300">Posição:</span>
-                     <span className="font-medium text-xs">
-                       {currentImageIndex + 1} de {totalPhotos}
-                     </span>
-                   </div>
-                 </div>
-               </div>
-             </div>
-           )}
+           
         </div>
 
         
@@ -811,40 +718,7 @@ export function ImageModal({
         )}
 
         
-        {showInfo && (
-          <div className="absolute top-20 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg max-w-sm z-[60]">
-            <h3 className="font-semibold mb-3 text-lg">Informações da Imagem</h3>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-gray-300">Nome:</span>
-                <p className="font-medium break-words">{currentImageName}</p>
-              </div>
-              {imageMetadata && (
-                <div>
-                  <span className="text-gray-300">Dimensões:</span>
-                  <p className="font-medium">{imageMetadata.width} x {imageMetadata.height} pixels</p>
-                </div>
-              )}
-              <div>
-                <span className="text-gray-300">Zoom:</span>
-                <p className="font-medium">{Math.round(zoomLevel * 100)}%</p>
-              </div>
-              <div>
-                <span className="text-gray-300">Rotação:</span>
-                <p className="font-medium">{rotation} deg</p>
-              </div>
-              <div>
-                <span className="text-gray-300">Fornecedor:</span>
-                <p className="font-medium">{conta.fornecedor}</p>
-              </div>
-              <div>
-                <span className="text-gray-300">Vencimento:</span>
-                <p className="font-medium">{new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}</p>
-              </div>
-            </div>
-          </div>
-
-        )}
+        
         
       </div>
     </div>
