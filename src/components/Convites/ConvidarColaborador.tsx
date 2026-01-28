@@ -22,27 +22,13 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
 }) => {
   const { hasPermission } = usePermissions(companyId);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const linkRef = useRef<HTMLInputElement>(null);
 
-  const roles = {
-    admin: {
-      label: 'Administrador',
-      description: 'Pode gerenciar colaboradores e configurações da empresa'
-    },
-    member: {
-      label: 'Membro',
-      description: 'Pode acessar e editar dados da empresa'
-    },
-    viewer: {
-      label: 'Visualizador',
-      description: 'Pode apenas visualizar dados da empresa'
-    }
-  };
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,24 +38,21 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
       setLoading(true);
       setMessage(null);
       
-      const result = await CollaboratorsService.inviteCollaborator({
-        company_id: companyId,
-        email: email.trim(),
-        role
-      });
+      const response = await fetch('/api/create-user-and-link-company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), companyId })
+      })
+      const result = await response.json()
 
       if (result.success) {
         setMessage({ 
           type: 'success', 
-          text: 'Convite criado com sucesso! Compartilhe o link de convite com o colaborador.' 
+          text: 'Usuário criado e vinculado à empresa.' 
         });
-        
-        // Set invite link
-        setInviteLink(result.inviteLink || `${window.location.origin}/convite/${result.inviteId}`);
         
         // Reset form
         setEmail('');
-        setRole('member');
         
         // Call callback
         onInviteSent?.();
@@ -92,7 +75,6 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
 
   const handleCancel = () => {
     setEmail('');
-    setRole('member');
     setMessage(null);
     setShowForm(false);
     onCancel?.();
@@ -161,34 +143,7 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
           </div>
         )}
         
-        {/* Invite Link */}
-        {inviteLink && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <Link className="h-4 w-4 text-blue-600" />
-              <h4 className="text-sm font-medium text-blue-800">Link de convite</h4>
-            </div>
-            <div className="flex items-center mt-2">
-              <input
-                ref={linkRef}
-                type="text"
-                value={inviteLink}
-                readOnly
-                className="flex-1 p-2 text-sm border border-blue-300 rounded-l-lg bg-white"
-              />
-              <button
-                onClick={() => {
-                  linkRef.current?.select();
-                  document.execCommand('copy');
-                }}
-                className="bg-blue-600 text-white p-2 rounded-r-lg hover:bg-blue-700 transition-colors"
-                title="Copiar link"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Field */}
@@ -213,35 +168,7 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
             </div>
           </div>
 
-          {/* Role Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Função do Colaborador
-            </label>
-            <div className="space-y-3">
-              {Object.entries(roles).map(([roleKey, roleInfo]) => (
-                <label key={roleKey} className="flex items-start space-x-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="role"
-                    value={roleKey}
-                    checked={role === roleKey}
-                    onChange={(e) => setRole(e.target.value as 'admin' | 'member' | 'viewer')}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    disabled={loading}
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">
-                      {roleInfo.label}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {roleInfo.description}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
+          
 
           {/* Actions */}
           <div className="flex space-x-3 pt-4">
@@ -258,7 +185,7 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
               ) : (
                 <>
                   <UserPlus className="h-4 w-4" />
-                  <span>Criar Convite</span>
+                  <span>Criar Usuário</span>
                 </>
               )}
             </button>

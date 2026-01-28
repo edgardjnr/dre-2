@@ -53,7 +53,6 @@ export interface PermissionCheckResult {
 // Mapeamento de roles para permissões
 export const ROLE_PERMISSIONS: RolePermissions = {
   owner: [
-    // Todas as permissões
     'canInviteCollaborators',
     'canRemoveCollaborators', 
     'canEditCollaboratorRoles',
@@ -77,47 +76,73 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'canManageApiKeys'
   ],
   admin: [
-    // Gestão de colaboradores (exceto remover outros admins)
     'canInviteCollaborators',
     'canRemoveCollaborators',
     'canEditCollaboratorRoles',
     'canViewCollaborators',
-    // Configurações da empresa (limitadas)
+    'canEditCompanySettings',
+    'canDeleteCompany',
     'canViewCompanySettings',
-    // Gestão completa de dados
     'canCreateData',
     'canEditData',
     'canDeleteData',
     'canViewData',
     'canExportData',
-    // Gestão completa de relatórios
     'canCreateReports',
     'canEditReports',
     'canDeleteReports',
     'canViewReports',
     'canExportReports',
-    // Algumas configurações avançadas
-    'canViewAuditLogs'
+    'canManageIntegrations',
+    'canManageBackups',
+    'canViewAuditLogs',
+    'canManageApiKeys'
   ],
   member: [
-    // Visualização de colaboradores
+    'canInviteCollaborators',
+    'canRemoveCollaborators',
+    'canEditCollaboratorRoles',
     'canViewCollaborators',
-    // Gestão básica de dados
+    'canEditCompanySettings',
+    'canDeleteCompany',
+    'canViewCompanySettings',
     'canCreateData',
     'canEditData',
+    'canDeleteData',
     'canViewData',
     'canExportData',
-    // Gestão básica de relatórios
     'canCreateReports',
     'canEditReports',
+    'canDeleteReports',
     'canViewReports',
-    'canExportReports'
+    'canExportReports',
+    'canManageIntegrations',
+    'canManageBackups',
+    'canViewAuditLogs',
+    'canManageApiKeys'
   ],
   viewer: [
-    // Apenas visualização
+    'canInviteCollaborators',
+    'canRemoveCollaborators',
+    'canEditCollaboratorRoles',
     'canViewCollaborators',
+    'canEditCompanySettings',
+    'canDeleteCompany',
+    'canViewCompanySettings',
+    'canCreateData',
+    'canEditData',
+    'canDeleteData',
     'canViewData',
-    'canViewReports'
+    'canExportData',
+    'canCreateReports',
+    'canEditReports',
+    'canDeleteReports',
+    'canViewReports',
+    'canExportReports',
+    'canManageIntegrations',
+    'canManageBackups',
+    'canViewAuditLogs',
+    'canManageApiKeys'
   ]
 };
 
