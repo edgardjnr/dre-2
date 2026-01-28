@@ -820,7 +820,7 @@ export function ImageModal({
               {imageMetadata && (
                 <div>
                   <span className="text-gray-300">Dimensões:</span>
-                  <p className="font-medium">{imageMetadata.width} × {imageMetadata.height} pixels</p>
+                  <p className="font-medium">{imageMetadata.width} x {imageMetadata.height} pixels</p>
                 </div>
               )}
               <div>
@@ -829,7 +829,7 @@ export function ImageModal({
               </div>
               <div>
                 <span className="text-gray-300">Rotação:</span>
-                <p className="font-medium">{rotation}°</p>
+                <p className="font-medium">{rotation} deg</p>
               </div>
               <div>
                 <span className="text-gray-300">Fornecedor:</span>
