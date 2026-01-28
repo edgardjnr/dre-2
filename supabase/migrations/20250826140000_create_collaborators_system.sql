@@ -28,7 +28,7 @@
           */
 
 -- Create ENUM types for roles and invitation status
-CREATE TYPE public.collaborator_role_enum AS ENUM ('master', 'collaborator');
+CREATE TYPE public.collaborator_role_enum AS ENUM ('collaborator');
 CREATE TYPE public.invitation_status_enum AS ENUM ('pending', 'accepted', 'rejected', 'expired');
 
 -- 1. Table: empresa_collaborators
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.invitations (
     email text NOT NULL,
     role public.collaborator_role_enum NOT NULL DEFAULT 'collaborator',
     status public.invitation_status_enum NOT NULL DEFAULT 'pending',
-    token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'base64'),
+    token text NOT NULL UNIQUE DEFAULT encode(extensions.gen_random_bytes(32), 'base64'),
     expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
     created_at timestamptz NOT NULL DEFAULT now(),
     accepted_at timestamptz NULL,
@@ -82,15 +82,10 @@ CREATE POLICY "Users can view collaborators of accessible companies" ON public.e
     );
 
 -- Only masters can manage collaborators
-CREATE POLICY "Masters can manage collaborators" ON public.empresa_collaborators
+CREATE POLICY "Owners can manage collaborators" ON public.empresa_collaborators
     FOR ALL
     USING (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
@@ -98,11 +93,6 @@ CREATE POLICY "Masters can manage collaborators" ON public.empresa_collaborators
     )
     WITH CHECK (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
@@ -115,11 +105,6 @@ CREATE POLICY "Users can view invitations for accessible companies" ON public.in
     FOR SELECT
     USING (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
@@ -128,15 +113,10 @@ CREATE POLICY "Users can view invitations for accessible companies" ON public.in
     );
 
 -- Only masters can create invitations
-CREATE POLICY "Masters can create invitations" ON public.invitations
+CREATE POLICY "Owners can create invitations" ON public.invitations
     FOR INSERT
     WITH CHECK (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
@@ -144,30 +124,20 @@ CREATE POLICY "Masters can create invitations" ON public.invitations
     );
 
 -- Masters can update and delete their invitations
-CREATE POLICY "Masters can manage invitations" ON public.invitations
+CREATE POLICY "Owners can manage invitations" ON public.invitations
     FOR UPDATE
     USING (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
         )
     );
 
-CREATE POLICY "Masters can delete invitations" ON public.invitations
+CREATE POLICY "Owners can delete invitations" ON public.invitations
     FOR DELETE
     USING (
         empresa_id IN (
-            SELECT empresa_id 
-            FROM public.empresa_collaborators 
-            WHERE user_id = auth.uid() AND role = 'master'
-        )
-        OR empresa_id IN (
             SELECT id 
             FROM public.empresas 
             WHERE user_id = auth.uid()
@@ -180,7 +150,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Insert the company creator as master collaborator
     INSERT INTO public.empresa_collaborators (empresa_id, user_id, role, invited_by)
-    VALUES (NEW.id, NEW.user_id, 'master', NEW.user_id);
+    VALUES (NEW.id, NEW.user_id, 'collaborator', NEW.user_id);
     
     RETURN NEW;
 END;
