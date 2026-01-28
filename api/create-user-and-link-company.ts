@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { randomBytes } from 'crypto'
 
 const SUPABASE_URL = process.env.SUPABASE_URL as string
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string
@@ -40,7 +41,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Criar usuário se não encontrado
     if (!userId) {
-      const { data: created, error: createError } = await admin.auth.admin.createUser({ email: normalizedEmail, email_confirm: true })
+      const tempPassword = randomBytes(32).toString('base64url')
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: normalizedEmail,
+        password: tempPassword,
+        email_confirm: true
+      })
       if (createError) {
         // Se o e-mail já existir, tentar localizar novamente com uma listagem maior
         const conflictMsg = (createError.message || '').toLowerCase()
