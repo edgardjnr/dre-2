@@ -119,12 +119,6 @@ ORDER BY u.created_at DESC;
 -- Conceder permissões na view para usuários master
 GRANT SELECT ON public.pending_users TO authenticated;
 
--- Criar política RLS para a view
-CREATE POLICY "Only master can view pending users" ON public.pending_users
-  FOR SELECT USING (
-    public.is_user_master((SELECT email FROM auth.users WHERE id = auth.uid()))
-  );
-
 -- Comentários
 COMMENT ON COLUMN public.profiles.approved IS 'Indica se o usuário foi aprovado pelo master';
 COMMENT ON COLUMN public.profiles.approved_by IS 'ID do usuário master que aprovou';
