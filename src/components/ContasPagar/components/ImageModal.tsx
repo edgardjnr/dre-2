@@ -432,8 +432,10 @@ export function ImageModal({
               >
                 <X className="w-5 h-5 text-white font-bold" />
               </button>
-            </div>
           </div>
+        )}
+        
+        </div>
 
           
           <div className="sm:hidden p-2 space-y-2">
