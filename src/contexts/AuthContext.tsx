@@ -299,7 +299,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (error) {
-        setError(error);
+        const status: any = (error as any)?.status ?? (error as any)?.code;
+        let message = (error as any)?.message ?? 'Erro ao enviar e-mail de redefinição';
+        if (status === 429 || /Too Many Requests/i.test(message)) {
+          message = 'Você já solicitou recentemente. Aguarde alguns minutos e tente novamente.';
+        } else if (/No API key/i.test(message)) {
+          message = 'Falha de configuração da API. Verifique a chave pública (anon) e a URL do projeto.';
+        }
+        setError(new Error(message));
         return false;
       }
 

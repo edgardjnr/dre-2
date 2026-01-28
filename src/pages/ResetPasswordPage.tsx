@@ -24,6 +24,8 @@ const ResetPasswordPage: React.FC = () => {
                 access_token: accessToken,
                 refresh_token: refreshToken
             });
+        } else {
+            setError('Abra a página pelo link recebido no e-mail para concluir a redefinição.');
         }
     }, [searchParams]);
 

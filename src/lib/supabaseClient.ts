@@ -59,7 +59,8 @@ const createSupabaseClient = (): SupabaseClient => {
       },
       global: {
         headers: {
-          'X-Client-Info': 'dre-system'
+          'X-Client-Info': 'dre-system',
+          apikey: supabaseAnonKey
         }
       },
       db: {
