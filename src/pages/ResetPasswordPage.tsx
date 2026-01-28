@@ -13,19 +13,33 @@ const ResetPasswordPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    // Verificar se há tokens de acesso na URL
+    // Verificar tokens na URL (hash ou query) e preparar sessão
     useEffect(() => {
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-        
+        const hash = window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : '';
+        const hashParams = new URLSearchParams(hash);
+        const queryAccessToken = searchParams.get('access_token');
+        const queryRefreshToken = searchParams.get('refresh_token');
+        const accessToken = queryAccessToken || hashParams.get('access_token');
+        const refreshToken = queryRefreshToken || hashParams.get('refresh_token');
+        const type = searchParams.get('type') || hashParams.get('type');
+
         if (accessToken && refreshToken) {
-            // Definir a sessão com os tokens da URL
             supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken
             });
+            setError(null);
         } else {
-            setError('Abra a página pelo link recebido no e-mail para concluir a redefinição.');
+            const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'PASSWORD_RECOVERY' && session) {
+                    setError(null);
+                } else if (!session) {
+                    setError('Abra a página pelo link recebido no e-mail para concluir a redefinição.');
+                }
+            });
+            return () => {
+                authListener.subscription.unsubscribe();
+            };
         }
     }, [searchParams]);
 
