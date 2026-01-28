@@ -139,6 +139,11 @@ export const LoginForm: React.FC = () => {
                                 {resetMessage}
                             </div>
                         )}
+                        {!resetMessage && error && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                                Falha ao enviar e-mail: {error.message || 'verifique o endereço e tente novamente.'}
+                            </div>
+                        )}
                         
                         <div className="mb-4">
                             <input
@@ -162,6 +167,8 @@ export const LoginForm: React.FC = () => {
                                                 setResetMessage('');
                                                 setResetEmail('');
                                             }, 3000);
+                                        } else {
+                                            setResetMessage('');
                                         }
                                     }
                                 }}
