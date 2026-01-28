@@ -848,23 +848,7 @@ export function ImageModal({
           </div>
 
         
-        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-4 z-[60]">
-          <div className="flex justify-between items-center">
-            <div className="text-white">
-              <p className="text-sm font-medium">{currentImageName}</p>
-              <p className="text-xs opacity-75">
-                Fornecedor: {conta.fornecedor} | Vencimento: {new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}
-              </p>
-            </div>
-            
-            {conta.status === 'paga' && (
-              <div className="flex items-center space-x-2 text-green-400">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Conta Paga</span>
-              </div>
-            )}
-          </div>
-        </div>
+        
       </div>
     </div>
   );
