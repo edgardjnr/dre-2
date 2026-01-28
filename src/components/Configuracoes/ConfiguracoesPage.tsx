@@ -228,7 +228,7 @@ export const ConfiguracoesPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">
-                          {collaborator.user?.user_metadata?.full_name || collaborator.user?.email || collaborator.user_id || 'Usuário'}
+                          {collaborator.user?.user_metadata?.full_name || collaborator.user?.email || 'Usuário'}
                         </p>
                         {collaborator.user?.email && (
                           <p className="text-sm text-gray-500">{collaborator.user.email}</p>

@@ -42,28 +42,56 @@ export class CollaboratorsService {
         company_id: row.company_id,
         user_id: row.user_id,
         role: row.role as CollaboratorRole,
+        invited_by: null,
+        joined_at: row.created_at,
         created_at: row.created_at,
+        updated_at: row.created_at,
         user: {
           id: row.user_id,
           email: row.user_email,
-          name: row.user_name
+          user_metadata: {
+            full_name: row.user_name
+          }
         }
       }));
     } catch (e) {
       const { data, error } = await supabase
         .from('company_collaborators')
-        .select('id, company_id, user_id, role, created_at')
+        .select('id, company_id, user_id, role, created_at, joined_at, invited_by, updated_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data || []).map((row: any) => ({
+      const rows = (data || []) as any[];
+      const userIds = rows.map(r => r.user_id).filter(Boolean);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+      const profilesById = new Map<string, { full_name: string | null; avatar_url: string | null }>();
+      (profilesData || []).forEach((p: any) => profilesById.set(p.id, { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null }));
+
+      return rows.map((row: any) => {
+        const profile = profilesById.get(row.user_id);
+        const fullName = profile?.full_name || 'Usuário';
+        return {
         id: row.id,
         company_id: row.company_id,
         user_id: row.user_id,
         role: row.role as CollaboratorRole,
+        invited_by: row.invited_by ?? null,
+        joined_at: row.joined_at || row.created_at,
         created_at: row.created_at,
-        user: undefined
-      }));
+        updated_at: row.updated_at || row.created_at,
+        user: {
+          id: row.user_id,
+          email: '',
+          user_metadata: {
+            full_name: fullName,
+            avatar_url: profile?.avatar_url ?? undefined
+          }
+        }
+      } as CompanyCollaborator;
+      });
     }
   }
 
