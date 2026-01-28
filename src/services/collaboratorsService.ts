@@ -33,23 +33,38 @@ interface InvitationRPCRow {
 export class CollaboratorsService {
   // Buscar colaboradores da empresa usando RPC
   static async getCompanyCollaborators(companyId: string): Promise<CompanyCollaborator[]> {
-    const { data, error } = await supabase
-      .rpc('get_company_collaborators', { p_company_id: companyId });
-
-    if (error) throw error;
-
-    return data.map((row: CollaboratorRPCRow) => ({
-      id: row.id,
-      company_id: row.company_id,
-      user_id: row.user_id,
-      role: row.role as CollaboratorRole,
-      created_at: row.created_at,
-      user: {
-        id: row.user_id,
-        email: row.user_email,
-        name: row.user_name
-      }
-    }));
+    try {
+      const { data, error } = await supabase
+        .rpc('get_company_collaborators', { p_company_id: companyId });
+      if (error) throw error;
+      return data.map((row: CollaboratorRPCRow) => ({
+        id: row.id,
+        company_id: row.company_id,
+        user_id: row.user_id,
+        role: row.role as CollaboratorRole,
+        created_at: row.created_at,
+        user: {
+          id: row.user_id,
+          email: row.user_email,
+          name: row.user_name
+        }
+      }));
+    } catch (e) {
+      const { data, error } = await supabase
+        .from('company_collaborators')
+        .select('id, company_id, user_id, role, created_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        company_id: row.company_id,
+        user_id: row.user_id,
+        role: row.role as CollaboratorRole,
+        created_at: row.created_at,
+        user: undefined
+      }));
+    }
   }
 
   // Buscar convites da empresa usando RPC

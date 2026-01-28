@@ -51,13 +51,10 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [collaboratorsData, invitationsData] = await Promise.all([
-        CollaboratorsService.getCompanyCollaborators(companyId),
-        CollaboratorsService.getCompanyInvitations(companyId)
-      ]);
+      const collaboratorsData = await CollaboratorsService.getCompanyCollaborators(companyId);
       
       setCollaborators(collaboratorsData);
-      setInvitations(invitationsData);
+      setInvitations([]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setMessage({ type: 'error', text: 'Erro ao carregar colaboradores' });
@@ -72,41 +69,30 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
 
     try {
       setInviteLoading(true);
-      const result = await CollaboratorsService.inviteCollaborator({
-        companyId,
-        email: inviteEmail.trim(),
-        role: inviteRole
+      const response = await fetch('/api/create-user-and-link-company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), companyId })
       });
+      const result = await response.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: 'Convite enviado com sucesso!' });
+        setMessage({ type: 'success', text: 'Usuário criado e vinculado à empresa!' });
         setInviteEmail('');
-        setInviteRole('member');
         setShowInviteForm(false);
         loadData(); // Recarregar dados
       } else {
-        setMessage({ type: 'error', text: result.error || 'Erro ao enviar convite' });
+        setMessage({ type: 'error', text: result.error || 'Erro ao criar usuário' });
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Erro ao enviar convite' });
+      setMessage({ type: 'error', text: error.message || 'Erro ao criar usuário' });
     } finally {
       setInviteLoading(false);
     }
   };
 
   const handleUpdateRole = async (collaboratorId: string, newRole: string) => {
-    try {
-      const result = await CollaboratorsService.updateCollaboratorRole(collaboratorId, newRole);
-      if (result.success) {
-        setMessage({ type: 'success', text: 'Função atualizada com sucesso!' });
-        setEditingCollaborator(null);
-        loadData();
-      } else {
-        setMessage({ type: 'error', text: result.error || 'Erro ao atualizar função' });
-      }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Erro ao atualizar função' });
-    }
+    setMessage({ type: 'error', text: 'Sistema de funções desativado. Todos os usuários são iguais.' });
   };
 
   const handleRemoveCollaborator = async (collaboratorId: string) => {
@@ -205,18 +191,7 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Função
-                </label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member' | 'viewer')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="viewer">Visualizador</option>
-                  <option value="member">Membro</option>
-                  <option value="admin">Administrador</option>
-                </select>
+                
               </div>
               <div className="flex space-x-3">
                 <button
@@ -275,30 +250,10 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
                       {collaborator.user?.email}
                     </p>
                     <div className="flex items-center space-x-2">
-                      {editingCollaborator === collaborator.id ? (
-                        <select
-                          defaultValue={collaborator.role}
-                          onChange={(e) => handleUpdateRole(collaborator.id, e.target.value)}
-                          className="text-xs px-2 py-1 border border-gray-300 rounded"
-                        >
-                          <option value="viewer">Visualizador</option>
-                          <option value="member">Membro</option>
-                          <option value="admin">Administrador</option>
-                          {collaborator.role === 'owner' && (
-                            <option value="owner">Proprietário</option>
-                          )}
-                        </select>
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          collaborator.role === 'owner' ? 'bg-purple-100 text-purple-800' :
-                          collaborator.role === 'admin' ? 'bg-red-100 text-red-800' :
-                          collaborator.role === 'member' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          <Shield className="h-3 w-3 mr-1" />
-                          {roles[collaborator.role as keyof typeof roles]}
-                        </span>
-                      )}
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Usuário
+                    </span>
                     </div>
                   </div>
                 </div>
@@ -314,14 +269,6 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
                       </button>
                     ) : (
                       <>
-                        <PermissionGate companyId={companyId} permission="canEditCollaboratorRoles">
-                          <button
-                            onClick={() => setEditingCollaborator(collaborator.id)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </button>
-                        </PermissionGate>
                         <PermissionGate companyId={companyId} permission="canRemoveCollaborators">
                           <button
                             onClick={() => handleRemoveCollaborator(collaborator.id)}
@@ -340,51 +287,7 @@ export const GerenciarColaboradores: React.FC<GerenciarColaboradoresProps> = ({ 
         </div>
       </div>
 
-      {/* Pending Invitations */}
-      {invitations.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Convites Pendentes</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {invitations.map((invitation) => (
-              <div key={invitation.id} className="px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{invitation.email}</p>
-                    <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        invitation.role === 'admin' ? 'bg-red-100 text-red-800' :
-                        invitation.role === 'member' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        <Shield className="h-3 w-3 mr-1" />
-                        {roles[invitation.role as keyof typeof roles]}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Expira em {new Date(invitation.expires_at).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <PermissionGate companyId={companyId} permission="canInviteCollaborators">
-                  <button
-                    onClick={() => handleCancelInvitation(invitation.id)}
-                    className="text-red-600 hover:text-red-800"
-                    title="Cancelar convite"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </PermissionGate>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };
