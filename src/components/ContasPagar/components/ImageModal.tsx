@@ -491,7 +491,6 @@ export function ImageModal({
                   <X className="w-4 h-4 text-white font-bold" />
                 </button>
               </div>
-        )}
         
             
 
@@ -845,9 +844,10 @@ export function ImageModal({
             </div>
           </div>
 
-        
+        )}
         
       </div>
     </div>
   );
+}
 }
