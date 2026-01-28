@@ -850,4 +850,3 @@ export function ImageModal({
     </div>
   );
 }
-}
