@@ -12,6 +12,9 @@ const ResetPasswordPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [recoverEmail, setRecoverEmail] = useState('');
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendSuccess, setResendSuccess] = useState<string | null>(null);
 
     // Verificar tokens na URL (hash ou query) e preparar sessão
     useEffect(() => {
@@ -22,6 +25,8 @@ const ResetPasswordPage: React.FC = () => {
         const accessToken = queryAccessToken || hashParams.get('access_token');
         const refreshToken = queryRefreshToken || hashParams.get('refresh_token');
         const type = searchParams.get('type') || hashParams.get('type');
+        const errorCode = searchParams.get('error_code') || hashParams.get('error_code');
+        const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
 
         if (accessToken && refreshToken) {
             supabase.auth.setSession({
@@ -29,6 +34,11 @@ const ResetPasswordPage: React.FC = () => {
                 refresh_token: refreshToken
             });
             setError(null);
+        } else if (errorCode || errorDesc) {
+            const message = errorCode === 'otp_expired'
+              ? 'O link do e-mail está inválido ou expirou. Solicite um novo e-mail de redefinição.'
+              : (errorDesc || 'Não foi possível validar o link. Solicite um novo e-mail de redefinição.');
+            setError(message);
         } else {
             const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
                 if (event === 'PASSWORD_RECOVERY' && session) {
@@ -79,6 +89,29 @@ const ResetPasswordPage: React.FC = () => {
         }
     };
 
+    const handleResend = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        setResendSuccess(null);
+        setResendLoading(true);
+        try {
+            const { error: sendError } = await supabase.auth.resetPasswordForEmail(recoverEmail.trim(), {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+            if (sendError) {
+                setResendSuccess(null);
+                setError(sendError.message || 'Erro ao enviar novo e-mail de redefinição.');
+            } else {
+                setResendSuccess('Enviamos um novo e-mail de redefinição. Verifique sua caixa de entrada.');
+                setError(null);
+            }
+        } catch {
+            setResendSuccess(null);
+            setError('Erro ao enviar novo e-mail. Tente novamente.');
+        } finally {
+            setResendLoading(false);
+        }
+    };
+
     if (success) {
         return (
             <AuthLayout title="Senha Redefinida!" description="Sua senha foi alterada com sucesso.">
@@ -99,6 +132,30 @@ const ResetPasswordPage: React.FC = () => {
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                         <strong className="font-bold">Erro! </strong>
                         <span className="block sm:inline">{error}</span>
+                    </div>
+                )}
+                {(!success && error) && (
+                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+                        <p className="text-sm mb-2">Solicite um novo e-mail de redefinição:</p>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="email"
+                                placeholder="seuemail@exemplo.com"
+                                value={recoverEmail}
+                                onChange={(e) => setRecoverEmail(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            />
+                            <button
+                                onClick={handleResend}
+                                disabled={resendLoading || !recoverEmail.trim()}
+                                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+                            >
+                                {resendLoading ? 'Enviando...' : 'Enviar novo e-mail'}
+                            </button>
+                        </div>
+                        {resendSuccess && (
+                            <p className="text-green-700 text-sm mt-2">{resendSuccess}</p>
+                        )}
                     </div>
                 )}
                 
