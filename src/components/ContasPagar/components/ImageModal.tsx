@@ -326,7 +326,7 @@ export function ImageModal({
       aria-labelledby="image-modal-title"
       aria-describedby="image-modal-description"
     >
-      {/* Título oculto para screen readers */}
+      
       <h1 id="image-modal-title" className="sr-only">
         Visualizador de Imagem - {currentImageName}
       </h1>
@@ -335,9 +335,9 @@ export function ImageModal({
       </div>
 
       <div className="relative w-full h-full flex flex-col">
-        {/* Barra de controles superior */}
+        
         <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 z-[60]">
-          {/* Layout para desktop - uma linha */}
+          
           <div className="hidden sm:flex p-4 justify-between items-center">
             <div className="flex items-center space-x-2">
               <button
@@ -440,9 +440,9 @@ export function ImageModal({
             </div>
           </div>
 
-          {/* Layout para mobile - duas linhas */}
+          
           <div className="sm:hidden p-2 space-y-2">
-            {/* Primeira linha - controles principais */}
+            
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-1">
                 <button
@@ -497,7 +497,7 @@ export function ImageModal({
               </div>
             </div>
 
-            {/* Segunda linha - controles secundários */}
+            
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-1">
                 <button
@@ -556,7 +556,7 @@ export function ImageModal({
           </div>
         </div>
 
-        {/* Controles de navegação */}
+        
         {hasMultiplePhotos && (
           <>
             <button
@@ -576,7 +576,7 @@ export function ImageModal({
           </>
         )}
 
-        {/* Container da imagem */}
+        
         <div
           ref={containerRef}
           className={`flex-1 flex items-center justify-center overflow-hidden relative transition-all duration-300 ease-in-out ${
@@ -596,7 +596,7 @@ export function ImageModal({
             touchAction: 'none' // Previne scroll nativo em dispositivos touch
           }}
         >
-          {/* Indicador de carregamento */}
+          
           {(isLoading || isImageLoading(currentImageUrl)) && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10">
               <div className="bg-white bg-opacity-90 rounded-lg p-4 flex items-center space-x-3">
@@ -606,7 +606,7 @@ export function ImageModal({
             </div>
           )}
 
-          {/* Erro de carregamento */}
+          
           {imageError && (
             <div 
               className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10"
@@ -682,7 +682,7 @@ export function ImageModal({
             }}
           />
 
-          {/* Indicadores de swipe para mobile */}
+          
            {isTouchDevice && swipeDirection && (
              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
                <div className={`bg-black bg-opacity-70 text-white px-6 py-3 rounded-full flex items-center space-x-2 transform transition-all duration-300 ${
@@ -705,7 +705,7 @@ export function ImageModal({
              </div>
            )}
            
-           {/* Painel de informações da imagem */}
+           
            {showImageInfo && imageMetadata && (
              <div className="absolute top-20 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg max-w-xs z-[60] backdrop-blur-sm">
                <div className="flex items-center justify-between mb-3">
@@ -784,7 +784,7 @@ export function ImageModal({
            )}
         </div>
 
-        {/* Thumbnails de navegação */}
+        
         {showThumbnails && allImages.length > 1 && (
           <div className="absolute bottom-20 left-0 right-0 bg-black bg-opacity-70 p-4 z-[60]">
             <div className="flex justify-center space-x-2 overflow-x-auto max-w-full">
@@ -813,7 +813,7 @@ export function ImageModal({
           </div>
         )}
 
-        {/* Painel de informações */}
+        
         {showInfo && (
           <div className="absolute top-20 right-4 bg-black bg-opacity-80 text-white p-4 rounded-lg max-w-sm z-[60]">
             <h3 className="font-semibold mb-3 text-lg">Informações da Imagem</h3>
