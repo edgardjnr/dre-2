@@ -433,7 +433,6 @@ export function ImageModal({
                 <X className="w-5 h-5 text-white font-bold" />
               </button>
           </div>
-        )}
         
         </div>
 
@@ -492,7 +491,9 @@ export function ImageModal({
                   <X className="w-4 h-4 text-white font-bold" />
                 </button>
               </div>
-            </div>
+        )}
+        
+            
 
             
             <div className="flex justify-between items-center">
