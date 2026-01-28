@@ -48,13 +48,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email_confirm: true
       })
       if (createError) {
+        const errMsg = (createError.message || '').toLowerCase()
+        // Fallback para casos onde o GoTrue retorna erro genérico de banco
+        if (errMsg.includes('database error creating new user')) {
+          const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
+            redirectTo: `${process.env.APP_URL || 'https://dre.onebots.com.br'}/reset-password`
+          })
+          if (inviteErr) {
+            return res.status(400).json({
+              success: false,
+              error: inviteErr.message || createError.message,
+              details: { primary: createError, fallback: inviteErr }
+            })
+          }
+          const { data: usersList3 } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+          userId = usersList3?.users.find(u => (u.email || '').toLowerCase() === normalizedEmail)?.id
+          if (!userId) {
+            return res.status(400).json({ success: false, error: 'User invite sent but user id not found' })
+          }
+        }
         // Se o e-mail já existir, tentar localizar novamente com uma listagem maior
-        const conflictMsg = (createError.message || '').toLowerCase()
-        if (conflictMsg.includes('already') || conflictMsg.includes('exists')) {
+        else if (errMsg.includes('already') || errMsg.includes('exists')) {
           const { data: usersList2 } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
           userId = usersList2?.users.find(u => (u.email || '').toLowerCase() === normalizedEmail)?.id
         } else {
-          return res.status(400).json({ success: false, error: createError.message })
+          return res.status(400).json({
+            success: false,
+            error: createError.message,
+            details: createError
+          })
         }
       } else {
         userId = created.user?.id
