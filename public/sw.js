@@ -1,8 +1,6 @@
-const CACHE_NAME = 'dre-pwa-v1';
-const urlsToCache = [
+const CACHE_NAME = 'dre-pwa-v2';
+const CORE_CACHE = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.json',
   '/favicon.svg',
   '/icon-192.png',
@@ -15,7 +13,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(CORE_CACHE);
       })
   );
 });
@@ -24,6 +22,32 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   // Não interceptar requisições para APIs externas
   if (event.request.url.includes('supabase.co/functions/v1/')) {
+    return;
+  }
+  // Evitar cache para assets de build do Vite (sempre rede)
+  if (event.request.url.includes('/assets/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  // Scripts e styles: priorizar rede
+  if (event.request.destination === 'script' || event.request.destination === 'style') {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+  // Navegação: network-first com fallback ao cache
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          return cached || caches.match('/');
+        })
+    );
     return;
   }
   
@@ -60,6 +84,7 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
 
 // Background sync for offline actions
