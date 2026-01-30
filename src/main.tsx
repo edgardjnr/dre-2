@@ -73,34 +73,36 @@ createRoot(document.getElementById('root')!).render(
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
-        
-        // Check for updates
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New content is available, prompt user to refresh
-                if (confirm('Nova versão disponível! Deseja atualizar?')) {
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
-                  window.location.reload();
-                }
-              }
-            });
+  const registerSW = async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      console.log('SW registered: ', registration);
+
+      // Force check for updates on load
+      try { registration.update(); } catch {}
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Auto-apply the new version without prompt
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
           }
         });
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
       });
-  });
+    } catch (registrationError) {
+      console.log('SW registration failed: ', registrationError);
+    }
+  };
 
-  // Handle service worker updates
+  window.addEventListener('load', registerSW);
+
+  // Reload once the new SW takes control
+  let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    reloaded = true;
     window.location.reload();
   });
 }

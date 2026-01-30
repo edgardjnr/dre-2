@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dre-pwa-v2';
+const CACHE_NAME = 'dre-pwa-v3';
 const CORE_CACHE = [
   '/',
   '/manifest.json',
@@ -12,10 +12,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
         return cache.addAll(CORE_CACHE);
       })
   );
+  self.skipWaiting();
 });
 
 // Fetch event - serve from cache when offline
@@ -34,19 +34,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
-  // Navegação: network-first com fallback ao cache
+  // Navegação: network-only para evitar index.html desatualizado após deploy
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          return cached || caches.match('/');
-        })
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match('/');
+        return cached || new Response('Offline', { status: 503 });
+      })
     );
     return;
   }
