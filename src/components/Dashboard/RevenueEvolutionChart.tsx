@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as Highcharts from 'highcharts';
 import { supabase } from '../../lib/supabaseClient';
+import { mapContaCategoriaToDreCategoria } from '../../utils/dreCategoria';
 
 interface RevenueData {
   month: string;
@@ -73,9 +74,10 @@ const RevenueEvolutionChart: React.FC = () => {
           
           // Classificar por categoria da conta
           if (conta) {
-            if (conta.categoria === 'Receita Bruta') {
+            const categoriaDre = mapContaCategoriaToDreCategoria(conta.categoria);
+            if (categoriaDre === 'Receita Bruta') {
               monthlyData[monthKey].receita_bruta += valor;
-            } else if (conta.categoria === 'Deduções e Impostos') {
+            } else if (categoriaDre === 'Deduções e Impostos') {
               monthlyData[monthKey].deducoes += Math.abs(valor);
             }
           }

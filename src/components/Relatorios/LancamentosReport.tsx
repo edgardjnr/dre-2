@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, Filter, Search, Calendar, FileText, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Lancamento, ContaContabil, ContaCategoria } from '../../types';
@@ -61,6 +61,23 @@ export const LancamentosReport: React.FC<LancamentosReportProps> = ({ empresaId,
   useEffect(() => {
     applyFilters();
   }, [lancamentos, filters, searchTerm]);
+
+  const categoriasDisponiveis = useMemo(() => {
+    return Array.from(new Set(contas.map(c => c.categoria).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [contas]);
+
+  const contasFiltradasPorCategoria = useMemo(() => {
+    if (!filters.categoria) return contas;
+    return contas.filter(conta => conta.categoria === filters.categoria);
+  }, [contas, filters.categoria]);
+
+  useEffect(() => {
+    if (!filters.conta) return;
+    if (!contasFiltradasPorCategoria.some(c => c.id === filters.conta)) {
+      setFilters(prev => ({ ...prev, conta: '' }));
+    }
+  }, [filters.conta, contasFiltradasPorCategoria]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -397,19 +414,17 @@ export const LancamentosReport: React.FC<LancamentosReportProps> = ({ empresaId,
               <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
               <select
                 value={filters.categoria}
-                onChange={(e) => setFilters(prev => ({ ...prev, categoria: e.target.value as ContaCategoria }))}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  categoria: e.target.value as ContaCategoria,
+                  conta: ''
+                }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Todas as categorias</option>
-                <option value="Receita Bruta">Receita Bruta</option>
-                <option value="Deduções e Impostos">Deduções e Impostos</option>
-                <option value="Custo dos Produtos Vendidos">Custo dos Produtos Vendidos</option>
-                <option value="Despesas Comerciais">Despesas Comerciais</option>
-                <option value="Despesas Administrativas">Despesas Administrativas</option>
-                <option value="Outras Despesas Operacionais">Outras Despesas Operacionais</option>
-                <option value="Receitas Financeiras">Receitas Financeiras</option>
-                <option value="Despesas Financeiras">Despesas Financeiras</option>
-                <option value="Impostos sobre Lucro">Impostos sobre Lucro</option>
+                {categoriasDisponiveis.map(categoria => (
+                  <option key={categoria} value={categoria}>{categoria}</option>
+                ))}
               </select>
             </div>
 
@@ -434,7 +449,7 @@ export const LancamentosReport: React.FC<LancamentosReportProps> = ({ empresaId,
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Todas as contas</option>
-                {contas.map(conta => (
+                {contasFiltradasPorCategoria.map(conta => (
                   <option key={conta.id} value={conta.id}>
                     {conta.codigo} - {conta.nome}
                   </option>

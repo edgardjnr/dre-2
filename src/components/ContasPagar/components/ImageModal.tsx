@@ -54,14 +54,24 @@ export function ImageModal({ isOpen, imageUrl, imageName, conta, onClose }: Imag
 
   const [signedMap, setSignedMap] = useState<Record<string, string>>({});
 
+  const extractStorageKey = (value: string): string | null => {
+    const url = String(value || '').trim();
+    if (!url) return null;
+    if (url.startsWith('data:')) return null;
+    if (url.startsWith('http')) {
+      const m = url.match(/\/contas-fotos\/(.+)$/);
+      return m?.[1] || null;
+    }
+    return url;
+  };
+
   useEffect(() => {
     const genSigned = async () => {
       const urls = allImages.map(i => i.url);
       const entries: [string, string][] = [];
       
       for (const url of urls) {
-        const m = url.match(/\/contas-fotos\/(.+)$/);
-        const key = m?.[1];
+        const key = extractStorageKey(url);
         if (key) {
           const { data, error } = await supabase.storage
             .from('contas-fotos')
@@ -136,7 +146,7 @@ export function ImageModal({ isOpen, imageUrl, imageName, conta, onClose }: Imag
       const currentIndex = index >= 0 ? index : 0;
       
       setCurrentImageIndex(currentIndex);
-      setCurrentImageUrl(allImages[currentIndex].url);
+      setCurrentImageUrl(signedMap[allImages[currentIndex].url] || allImages[currentIndex].url);
       setCurrentImageName(allImages[currentIndex].name);
       setImageError(false);
       setRetryCount(0);
@@ -145,7 +155,7 @@ export function ImageModal({ isOpen, imageUrl, imageName, conta, onClose }: Imag
       const urls = allImages.map(img => img.url);
       preloadAdjacent(urls, currentIndex);
     }
-  }, [isOpen, imageUrl, allImages, preloadAdjacent]);
+  }, [isOpen, imageUrl, allImages, preloadAdjacent, signedMap]);
 
   // Preload quando mudar de imagem
   useEffect(() => {

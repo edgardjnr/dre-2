@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { ContaPagar, ContaPagarFormData, ContaPagarStatus, ContaContabil } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +8,7 @@ import { Spinner } from '../ui/Spinner';
 import { useDebounce } from '../../hooks/useDebounce';
 import { applyDateMask, isValidDate, convertToISODate, convertFromISODate, formatDateForDatabase } from '../../utils/dateUtils';
 import { DatePicker } from '../ui/DatePicker';
+import { ImageModal } from './components/ImageModal';
 
 interface ContaPagarFormProps {
   conta?: ContaPagar;
@@ -75,6 +76,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
 
   // Estado para empresa selecionada (separado do formData)
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string>('');
+  const [selectedCategoriaDre, setSelectedCategoriaDre] = useState<string>('');
   
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
@@ -83,6 +85,50 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const contasContabeisFiltradas = contasContabeis.filter(
     conta => conta.empresaId === selectedEmpresaId
   );
+
+  const categoriasDisponiveis = useMemo(() => {
+    return Array.from(new Set(contasContabeisFiltradas.map(c => c.categoria).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [contasContabeisFiltradas]);
+
+  const contasContabeisPorCategoria = useMemo(() => {
+    if (!selectedCategoriaDre) return [];
+    return contasContabeisFiltradas.filter(c => c.categoria === selectedCategoriaDre);
+  }, [contasContabeisFiltradas, selectedCategoriaDre]);
+
+  const extractStorageKey = (value: string): string | null => {
+    const url = String(value || '').trim();
+    if (!url) return null;
+    if (url.startsWith('data:')) return null;
+    if (url.startsWith('http')) {
+      const m = url.match(/\/contas-fotos\/(.+)$/);
+      return m?.[1] || null;
+    }
+    return url;
+  };
+
+  useEffect(() => {
+    if (selectedCategoriaDre && !categoriasDisponiveis.includes(selectedCategoriaDre)) {
+      setSelectedCategoriaDre('');
+    }
+  }, [categoriasDisponiveis, selectedCategoriaDre]);
+
+  useEffect(() => {
+    if (!formData.contaContabilId) return;
+    const contaAtual = contasContabeisFiltradas.find(c => c.id === formData.contaContabilId);
+    if (contaAtual && contaAtual.categoria !== selectedCategoriaDre) {
+      setSelectedCategoriaDre(contaAtual.categoria);
+    }
+  }, [contasContabeisFiltradas, formData.contaContabilId, selectedCategoriaDre]);
+
+  useEffect(() => {
+    if (!formData.contaContabilId) return;
+    const contaAtual = contasContabeisFiltradas.find(c => c.id === formData.contaContabilId);
+    if (!contaAtual) return;
+    if (selectedCategoriaDre && contaAtual.categoria !== selectedCategoriaDre) {
+      setFormData(prev => ({ ...prev, contaContabilId: '' }));
+    }
+  }, [contasContabeisFiltradas, formData.contaContabilId, selectedCategoriaDre]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +141,9 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const [existingPhotos, setExistingPhotos] = useState<Array<{id: string, url: string, name: string}>>([]);
   const [photosToRemove, setPhotosToRemove] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [signedPhotoUrls, setSignedPhotoUrls] = useState<Record<string, string>>({});
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   
   // Estados para sugestões de fornecedores
   const [fornecedoresSugeridos, setFornecedoresSugeridos] = useState<string[]>([]);
@@ -175,6 +224,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         descricao: conta.descricao || ''
       });
       setSelectedEmpresaId(conta.empresaId);
+      setSelectedCategoriaDre('');
       setValorFormatado(formatarMoeda(conta.valor));
       setDataVencimentoFormatada(convertFromISODate(conta.dataVencimento));
       
@@ -182,6 +232,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       loadExistingPhotos(conta.id);
     } else {
       // Limpar estados ao criar nova conta
+      setSelectedCategoriaDre('');
       setExistingPhotos([]);
       setPhotosToRemove([]);
       setPhotoFiles([]);
@@ -189,6 +240,81 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       setDataVencimentoFormatada('');
     }
   }, [conta]);
+
+  useEffect(() => {
+    const generateSigned = async () => {
+      const entries: [string, string][] = [];
+      for (const photo of existingPhotos) {
+        const key = extractStorageKey(photo.url);
+        if (!key) continue;
+        const { data, error } = await supabase.storage
+          .from('contas-fotos')
+          .createSignedUrl(key, 60 * 60 * 24 * 7);
+        if (!error && data?.signedUrl) {
+          entries.push([photo.url, data.signedUrl]);
+        }
+      }
+      if (entries.length > 0) {
+        setSignedPhotoUrls(prev => {
+          const next = { ...prev };
+          for (const [orig, signed] of entries) next[orig] = signed;
+          return next;
+        });
+      }
+    };
+    if (existingPhotos.length > 0) {
+      generateSigned();
+    }
+  }, [existingPhotos]);
+
+  const contaParaModal = useMemo<ContaPagar>(() => {
+    const fotos: ContaPagar['fotos'] = [
+      ...existingPhotos.map((p, idx) => ({
+        id: p.id,
+        contaPagarId: conta?.id || 'temp',
+        fotoUrl: p.url,
+        fotoNome: p.name,
+        ordem: idx + 1,
+        createdAt: conta?.createdAt || new Date().toISOString()
+      })),
+      ...photoPreviews.map((url, idx) => ({
+        id: `new-${idx}`,
+        contaPagarId: conta?.id || 'temp',
+        fotoUrl: url,
+        fotoNome: `Preview ${idx + 1}`,
+        ordem: existingPhotos.length + idx + 1,
+        createdAt: conta?.createdAt || new Date().toISOString()
+      }))
+    ];
+
+    return {
+      id: conta?.id || 'temp',
+      fornecedor: formData.fornecedor || conta?.fornecedor || '',
+      descricao: formData.descricao || conta?.descricao || '',
+      valor: formData.valor || conta?.valor || 0,
+      dataVencimento: formData.dataVencimento || conta?.dataVencimento || '',
+      status: conta?.status || 'pendente',
+      contaContabilId: formData.contaContabilId || conta?.contaContabilId,
+      numeroDocumento: formData.numeroDocumento || conta?.numeroDocumento,
+      observacoes: formData.observacoes || conta?.observacoes,
+      empresaId: selectedEmpresaId || conta?.empresaId || '',
+      fotos,
+      createdAt: conta?.createdAt || new Date().toISOString(),
+      updatedAt: conta?.updatedAt || new Date().toISOString()
+    };
+  }, [
+    conta,
+    existingPhotos,
+    formData.contaContabilId,
+    formData.dataVencimento,
+    formData.descricao,
+    formData.fornecedor,
+    formData.numeroDocumento,
+    formData.observacoes,
+    formData.valor,
+    photoPreviews,
+    selectedEmpresaId
+  ]);
 
   const fetchEmpresas = async () => {
     try {
@@ -495,11 +621,8 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           .upload(filePath, file);
     
         if (uploadError) throw uploadError;
-    
-        const { data: { publicUrl } } = supabase.storage
-          .from('contas-fotos')
-          .getPublicUrl(filePath);
-        return { url: publicUrl, name: file.name };
+
+        return { url: filePath, name: file.name };
       });
 
       return await Promise.all(uploadPromises);
@@ -625,6 +748,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
               value={selectedEmpresaId}
               onChange={(e) => {
                 setSelectedEmpresaId(e.target.value);
+                setSelectedCategoriaDre('');
                 setFormData(prev => ({ ...prev, contaContabilId: '' })); // Limpar conta contábil ao trocar empresa
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
@@ -762,6 +886,36 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           </div>
 
           
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Tag className="inline w-4 h-4 mr-1" />
+              Categoria DRE
+            </label>
+            <select
+              value={selectedCategoriaDre}
+              onChange={(e) => {
+                setSelectedCategoriaDre(e.target.value);
+                setFormData(prev => ({ ...prev, contaContabilId: '' }));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
+              disabled={!selectedEmpresaId || categoriasDisponiveis.length === 0}
+            >
+              <option value="">
+                {!selectedEmpresaId
+                  ? 'Selecione uma empresa primeiro'
+                  : categoriasDisponiveis.length === 0
+                    ? 'Nenhuma categoria disponível'
+                    : 'Selecione uma categoria'
+                }
+              </option>
+              {categoriasDisponiveis.map(categoria => (
+                <option key={categoria} value={categoria} className="text-ellipsis overflow-hidden">
+                  {categoria}
+                </option>
+              ))}
+            </select>
+          </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Tag className="inline w-4 h-4 mr-1" />
@@ -771,9 +925,10 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 value={formData.contaContabilId || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, contaContabilId: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
+                disabled={!selectedEmpresaId || !selectedCategoriaDre || contasContabeisPorCategoria.length === 0}
               >
                 <option value="">Selecione uma conta contábil</option>
-                {contasContabeisFiltradas.map(conta => (
+                {contasContabeisPorCategoria.map(conta => (
                   <option key={conta.id} value={conta.id} className="text-ellipsis overflow-hidden">
                     {conta.codigo} - {conta.nome}
                   </option>
@@ -846,14 +1001,19 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           >
             {(existingPhotos.length > 0 || photoPreviews.length > 0) ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Imagens existentes */}
                   {existingPhotos.map((photo, index) => (
                     <div key={`existing-${photo.id}`} className="relative group">
                       <img
-                        src={photo.url}
+                        src={signedPhotoUrls[photo.url] || photo.url}
                         alt={photo.name}
-                        className="w-full h-32 object-cover rounded-lg border"
+                        className="w-full h-40 sm:h-32 object-cover rounded-lg border cursor-pointer"
+                        loading="lazy"
+                        onClick={() => {
+                          setSelectedImage({ url: photo.url, name: photo.name });
+                          setShowImageModal(true);
+                        }}
                       />
                       <button
                         type="button"
@@ -873,7 +1033,12 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                       <img
                         src={preview}
                         alt={`Preview ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border"
+                        className="w-full h-40 sm:h-32 object-cover rounded-lg border cursor-pointer"
+                        loading="lazy"
+                        onClick={() => {
+                          setSelectedImage({ url: preview, name: `Preview ${index + 1}` });
+                          setShowImageModal(true);
+                        }}
                       />
                       <button
                         type="button"
@@ -917,6 +1082,19 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           </div>
         </div>
 
+        {showImageModal && selectedImage && (
+          <ImageModal
+            isOpen={showImageModal}
+            imageUrl={selectedImage.url}
+            imageName={selectedImage.name}
+            conta={contaParaModal}
+            onClose={() => {
+              setShowImageModal(false);
+              setSelectedImage(null);
+            }}
+          />
+        )}
+        
         
         <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
           <button

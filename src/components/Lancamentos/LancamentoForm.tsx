@@ -31,6 +31,7 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
 
   const [formData, setFormData] = useState(getInitialState());
   const [valorFormatado, setValorFormatado] = useState('0,00');
+  const [categoriaDre, setCategoriaDre] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,16 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
       c.ativa
     );
   }, [contas, formData.empresaId]);
+
+  const categoriasDisponiveis = useMemo(() => {
+    return Array.from(new Set(contasFiltradas.map(c => c.categoria).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [contasFiltradas]);
+
+  const contasPorCategoria = useMemo(() => {
+    if (!categoriaDre) return [];
+    return contasFiltradas.filter(c => c.categoria === categoriaDre);
+  }, [contasFiltradas, categoriaDre]);
 
   useEffect(() => {
     if (lancamento) {
@@ -53,19 +64,41 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
         valor: valor,
         tipo: lancamento.tipo || 'Débito',
       });
+      setCategoriaDre(contas.find(c => c.id === lancamento.contaId)?.categoria || '');
       setValorFormatado(formatCurrencyInput(valor));
     } else {
       setFormData(getInitialState());
       setValorFormatado('0,00');
+      setCategoriaDre('');
     }
-  }, [lancamento, empresas]);
+  }, [lancamento, empresas, contas]);
   
   // Reset contaId if empresa changes and the current contaId is not valid
   useEffect(() => {
+    if (categoriaDre && !categoriasDisponiveis.includes(categoriaDre)) {
+      setCategoriaDre('');
+    }
     if (formData.empresaId && !contasFiltradas.some(c => c.id === formData.contaId)) {
       setFormData(prev => ({ ...prev, contaId: '' }));
     }
-  }, [contasFiltradas, formData.contaId, formData.empresaId]);
+  }, [contasFiltradas, formData.contaId, formData.empresaId, categoriaDre, categoriasDisponiveis]);
+
+  useEffect(() => {
+    if (!formData.contaId) return;
+    const contaAtual = contasFiltradas.find(c => c.id === formData.contaId);
+    if (contaAtual && contaAtual.categoria !== categoriaDre) {
+      setCategoriaDre(contaAtual.categoria);
+    }
+  }, [formData.contaId, contasFiltradas, categoriaDre]);
+
+  useEffect(() => {
+    if (!formData.contaId) return;
+    const contaAtual = contasFiltradas.find(c => c.id === formData.contaId);
+    if (!contaAtual) return;
+    if (categoriaDre && contaAtual.categoria !== categoriaDre) {
+      setFormData(prev => ({ ...prev, contaId: '' }));
+    }
+  }, [categoriaDre, formData.contaId, contasFiltradas]);
 
   // Função para formatar valor como moeda para exibição
   const formatCurrencyInput = (value: number): string => {
@@ -197,7 +230,7 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Empresa *
@@ -215,6 +248,34 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
             ))}
           </select>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Categoria DRE *
+          </label>
+          <select
+            value={categoriaDre}
+            onChange={(e) => {
+              setCategoriaDre(e.target.value);
+              setFormData(prev => ({ ...prev, contaId: '' }));
+            }}
+            required
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!formData.empresaId || categoriasDisponiveis.length === 0}
+          >
+            <option value="" disabled>
+              {!formData.empresaId
+                ? 'Selecione uma empresa primeiro'
+                : categoriasDisponiveis.length === 0
+                  ? 'Nenhuma categoria disponível'
+                  : 'Selecione uma categoria'
+              }
+            </option>
+            {categoriasDisponiveis.map(categoria => (
+              <option key={categoria} value={categoria}>{categoria}</option>
+            ))}
+          </select>
+        </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -226,17 +287,19 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
             onChange={handleChange} 
             required 
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
-            disabled={!formData.empresaId || contasFiltradas.length === 0}
+            disabled={!formData.empresaId || !categoriaDre || contasPorCategoria.length === 0}
           >
             <option value="" disabled>
               {!formData.empresaId 
                 ? 'Selecione uma empresa primeiro' 
-                : contasFiltradas.length === 0 
-                  ? 'Nenhuma conta analítica disponível' 
-                  : 'Selecione uma conta'
+                : !categoriaDre
+                  ? 'Selecione uma categoria primeiro'
+                  : contasPorCategoria.length === 0 
+                    ? 'Nenhuma conta disponível nesta categoria' 
+                    : 'Selecione uma conta'
               }
             </option>
-            {contasFiltradas.map(c => (
+            {contasPorCategoria.map(c => (
               <option key={c.id} value={c.id}>
                 {c.codigo} - {c.nome}
               </option>

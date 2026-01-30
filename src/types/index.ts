@@ -1,13 +1,4 @@
-export type ContaCategoria = 
-  | 'Receita Bruta'
-  | 'Deduções e Impostos'
-  | 'Custo dos Produtos Vendidos'
-  | 'Despesas Comerciais'
-  | 'Despesas Administrativas'
-  | 'Outras Despesas Operacionais'
-  | 'Receitas Financeiras'
-  | 'Despesas Financeiras'
-  | 'Impostos sobre Lucro';
+export type ContaCategoria = string;
 
 export type ContaPagarStatus = 'pendente' | 'paga' | 'vencida' | 'cancelada';
 
@@ -183,4 +174,3 @@ export interface ContaPagarFormData {
   observacoes?: string;
   foto?: File;
 }
-

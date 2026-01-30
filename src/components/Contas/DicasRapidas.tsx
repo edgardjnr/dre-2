@@ -1,18 +1,20 @@
 import React from 'react';
-import { Lightbulb, BookOpen, Calculator, DollarSign } from 'lucide-react';
+import { Lightbulb, BookOpen, Calculator, DollarSign, Users, Megaphone, Briefcase } from 'lucide-react';
 import { ContaCategoria } from '../../types';
 
 interface DicasRapidasProps {
   categoria: ContaCategoria;
 }
 
-const dicasRapidas: Record<ContaCategoria, {
+type DicasInfo = {
   icon: React.ComponentType<any>;
   color: string;
   dicas: string[];
   codigoExemplo: string;
-}> = {
-  'Receita Bruta': {
+};
+
+const dicasRapidasPorGrupo: Record<string, DicasInfo> = {
+  '1': {
     icon: DollarSign,
     color: 'text-green-600',
     dicas: [
@@ -22,7 +24,7 @@ const dicasRapidas: Record<ContaCategoria, {
     ],
     codigoExemplo: '3.1.1.01'
   },
-  'Deduções e Impostos': {
+  '2': {
     icon: Calculator,
     color: 'text-red-600',
     dicas: [
@@ -32,7 +34,7 @@ const dicasRapidas: Record<ContaCategoria, {
     ],
     codigoExemplo: '3.2.1.01'
   },
-  'Custo dos Produtos Vendidos': {
+  '3': {
     icon: Calculator,
     color: 'text-orange-600',
     dicas: [
@@ -42,37 +44,47 @@ const dicasRapidas: Record<ContaCategoria, {
     ],
     codigoExemplo: '4.1.1.01'
   },
-  'Despesas Comerciais': {
-    icon: BookOpen,
-    color: 'text-purple-600',
+  '4': {
+    icon: Users,
+    color: 'text-indigo-600',
     dicas: [
-      'Gastos com vendas e marketing',
+      'Registre salários, encargos e benefícios do time',
       'Use débito para registrar despesas',
-      'Código sugerido: 4.2.1.xx'
+      'Código sugerido: 4.2.x.xx'
     ],
     codigoExemplo: '4.2.1.01'
   },
-  'Despesas Administrativas': {
+  '5': {
     icon: BookOpen,
     color: 'text-blue-600',
     dicas: [
       'Gastos gerais de administração',
       'Use débito para registrar despesas',
-      'Código sugerido: 4.2.2.xx'
+      'Código sugerido: 4.2.x.xx'
     ],
     codigoExemplo: '4.2.2.01'
   },
-  'Outras Despesas Operacionais': {
+  '6': {
     icon: BookOpen,
     color: 'text-gray-600',
     dicas: [
-      'Despesas operacionais diversas',
+      'Despesas operacionais do dia a dia',
       'Use débito para registrar despesas',
-      'Código sugerido: 4.2.3.xx'
+      'Código sugerido: 4.2.x.xx'
     ],
     codigoExemplo: '4.2.3.01'
   },
-  'Receitas Financeiras': {
+  '7': {
+    icon: Megaphone,
+    color: 'text-purple-600',
+    dicas: [
+      'Gastos com vendas e marketing',
+      'Use débito para registrar despesas',
+      'Código sugerido: 4.2.x.xx'
+    ],
+    codigoExemplo: '4.2.4.01'
+  },
+  '8': {
     icon: DollarSign,
     color: 'text-emerald-600',
     dicas: [
@@ -82,7 +94,7 @@ const dicasRapidas: Record<ContaCategoria, {
     ],
     codigoExemplo: '3.3.1.01'
   },
-  'Despesas Financeiras': {
+  '9': {
     icon: Calculator,
     color: 'text-pink-600',
     dicas: [
@@ -92,7 +104,7 @@ const dicasRapidas: Record<ContaCategoria, {
     ],
     codigoExemplo: '4.3.1.01'
   },
-  'Impostos sobre Lucro': {
+  '10': {
     icon: Calculator,
     color: 'text-yellow-600',
     dicas: [
@@ -101,11 +113,24 @@ const dicasRapidas: Record<ContaCategoria, {
       'Código sugerido: 4.4.x.xx'
     ],
     codigoExemplo: '4.4.1.01'
+  },
+  '11': {
+    icon: Briefcase,
+    color: 'text-slate-700',
+    dicas: [
+      'Use para retiradas/pró-labore dos sócios (fora da DRE operacional)',
+      'Separe bem de despesas operacionais do negócio',
+      'Código sugerido: 5.x.x.xx'
+    ],
+    codigoExemplo: '5.1.1.01'
   }
 };
 
 export const DicasRapidas: React.FC<DicasRapidasProps> = ({ categoria }) => {
-  const info = dicasRapidas[categoria];
+  if (!categoria) return null;
+  const grupo = String(categoria).match(/^\s*(\d+)\./)?.[1] || String(categoria).match(/^\s*(\d+)/)?.[1] || '';
+  const info = grupo ? dicasRapidasPorGrupo[grupo] : undefined;
+  if (!info) return null;
   const Icon = info.icon;
 
   return (

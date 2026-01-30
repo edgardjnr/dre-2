@@ -469,21 +469,18 @@ export const ContasPagarList: React.FC = () => {
       if (withComprovante && comprovanteFile) {
         const fileExt = comprovanteFile.name.split('.').pop();
         const fileName = `comprovante_${contaParaPagar.id}_${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('contas-fotos')
-          .upload(`${user.id}/${fileName}`, comprovanteFile);
+          .upload(filePath, comprovanteFile);
           
         if (uploadError) {
           console.error('Erro ao fazer upload do comprovante:', uploadError);
           throw new Error('Erro ao fazer upload do comprovante');
         }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('contas-fotos')
-          .getPublicUrl(`${user.id}/${fileName}`);
-          
-        comprovanteUrl = publicUrl;
+
+        comprovanteUrl = filePath;
         comprovanteNome = comprovanteFile.name;
       }
       

@@ -88,6 +88,17 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
   const [copiado, setCopiado] = useState(false);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
+  const extractStorageKey = (value: string): string | null => {
+    const url = String(value || '').trim();
+    if (!url) return null;
+    if (url.startsWith('data:')) return null;
+    if (url.startsWith('http')) {
+      const m = url.match(/\/contas-fotos\/(.+)$/);
+      return m?.[1] || null;
+    }
+    return url;
+  };
+
   useEffect(() => {
     const generateSigned = async () => {
       const urls: string[] = [];
@@ -97,8 +108,7 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
       }
       const entries: [string, string][] = [];
       for (const url of urls) {
-        const m = url.match(/\/contas-fotos\/(.+)$/);
-        const key = m?.[1];
+        const key = extractStorageKey(url);
         if (key) {
           const { data, error } = await supabase.storage.from('contas-fotos').createSignedUrl(key, 60 * 60 * 24 * 7);
           if (!error && data?.signedUrl) {

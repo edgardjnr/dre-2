@@ -1,5 +1,6 @@
 import { DREPeriodo, Lancamento, ContaContabil } from '../types';
 import { isWithinInterval, parseISO } from 'date-fns';
+import { isReceitaDreCategoria, mapContaCategoriaToDreCategoria } from '../utils/dreCategoria';
 
 export class DREService {
   static calcularDRE(
@@ -107,25 +108,23 @@ export class DREService {
       const conta = contasContabeis.find(c => c.id === lancamento.contaId);
       if (!conta) return;
 
-      const categoria = conta.categoria;
-      if (!resultado[categoria]) {
-        resultado[categoria] = 0;
+      const categoriaDre = mapContaCategoriaToDreCategoria(conta.categoria);
+      if (!categoriaDre) return;
+
+      if (!resultado[categoriaDre]) {
+        resultado[categoriaDre] = 0;
       }
 
       // Para receitas, considerar créditos como positivos
       // Para despesas/custos, considerar débitos como positivos
-      const valor = this.isReceita(categoria) 
+      const valor = isReceitaDreCategoria(categoriaDre) 
         ? (lancamento.tipo === 'Crédito' ? lancamento.valor : -lancamento.valor)
         : (lancamento.tipo === 'Débito' ? lancamento.valor : -lancamento.valor);
 
-      resultado[categoria] += valor;
+      resultado[categoriaDre] += valor;
     });
 
     return resultado;
-  }
-
-  private static isReceita(categoria: string): boolean {
-    return categoria === 'Receita Bruta' || categoria === 'Receitas Financeiras';
   }
 
   static obterContasIndividuais(
@@ -152,13 +151,15 @@ export class DREService {
       if (!conta) return;
 
       // Filtrar apenas contas de despesas/custos (não receitas)
-      if (this.isReceita(conta.categoria)) return;
+      const categoriaDre = mapContaCategoriaToDreCategoria(conta.categoria);
+      if (!categoriaDre) return;
+      if (isReceitaDreCategoria(categoriaDre)) return;
 
       const chave = conta.id;
       if (!resultado[chave]) {
         resultado[chave] = {
           nome: conta.nome,
-          categoria: conta.categoria,
+          categoria: categoriaDre,
           valor: 0
         };
       }

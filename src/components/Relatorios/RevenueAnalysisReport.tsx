@@ -9,6 +9,7 @@ import { DREService } from '../../services/dreService';
 import { Lancamento, ContaContabil } from '../../types';
 import { Spinner } from '../ui/Spinner';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { isReceitaDreCategoria, mapContaCategoriaToDreCategoria } from '../../utils/dreCategoria';
 
 interface RevenueAnalysisReportProps {
   empresaId: string;
@@ -139,9 +140,10 @@ export const RevenueAnalysisReport: React.FC<RevenueAnalysisReportProps> = ({ em
     const last3Months = subMonths(new Date(), 3);
     const recentLancamentos = lancamentos.filter(l => new Date(l.data) >= last3Months);
 
-    const revenueAccounts = contas.filter(c => 
-      c.categoria === 'Receita Bruta' || c.categoria === 'Receitas Financeiras'
-    );
+    const revenueAccounts = contas.filter(c => {
+      const categoriaDre = mapContaCategoriaToDreCategoria(c.categoria);
+      return categoriaDre ? isReceitaDreCategoria(categoriaDre) : false;
+    });
 
     revenueAccounts.forEach(conta => {
       const revenue = recentLancamentos

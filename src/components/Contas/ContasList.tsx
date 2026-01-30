@@ -22,9 +22,31 @@ export const ContasList: React.FC = () => {
   const [filtroCategoria, setFiltroCategoria] = useState('');
 
   const categorias = [
-    'Receita Bruta', 'Deduções e Impostos', 'Custo dos Produtos Vendidos',
-    'Despesas Comerciais', 'Despesas Administrativas', 'Outras Despesas Operacionais',
-    'Receitas Financeiras', 'Despesas Financeiras', 'Impostos sobre Lucro'
+    '1. Receita Bruta', '1.1 Venda de Bebidas', '1.1.1 Cervejas', '1.1.2 Drinks', '1.1.3 Destilados', '1.1.4 Vinhos', '1.1.5 Bebidas Não Alcoólicas',
+    '1.2 Venda de Alimentos', '1.2.1 Petiscos', '1.2.2 Pratos', '1.2.3 Sobremesas',
+    '1.3 Serviços', '1.3.1 Couvert Artístico', '1.3.2 Taxa de Serviço (10%)', '1.3.3 Reservas / Eventos',
+    '2. Deduções e Impostos sobre Vendas', '2.1 Taxas de Cartão', '2.1.1 Débito', '2.1.2 Crédito à Vista', '2.1.3 Crédito Parcelado', '2.1.4 Pix', '2.1.5 Vale Alimentação', '2.1.6 Conta Assinada',
+    '2.2 Aplicativos / Intermediadores', '2.2.1 iFood', '2.2.2 Rappi', '2.2.3 Outros',
+    '2.3 Impostos sobre Vendas', '2.3.1 ICMS', '2.3.2 ISS', '2.3.3 Simples Nacional', '2.4 Cancelamentos e Estornos',
+    '3. Custo dos Produtos Vendidos (CPV)', '3.1 Bebidas – Insumos', '3.1.1 Cervejas', '3.1.2 Destilados', '3.1.3 Vinhos', '3.1.4 Xaropes / Essências',
+    '3.2 Alimentos – Insumos', '3.2.1 Carnes', '3.2.2 Frios', '3.2.3 Pães', '3.2.4 Congelados',
+    '3.3 Insumos Operacionais', '3.3.1 Gelo', '3.3.2 Copos Descartáveis', '3.3.3 Canudos', '3.3.4 Guardanapos',
+    '3.4 Perdas', '3.4.1 Quebras', '3.4.2 Vencimentos', '3.4.3 Desperdícios',
+    '4. Despesas com Pessoal', '4.1 Salários Operacionais', '4.1.1 Garçons', '4.1.2 Bartenders', '4.1.3 Cozinha',
+    '4.2 Salários de Gestão', '4.2.1 Gerente Operacional (CLT)', '4.2.2 Subgerente', '4.2.3 Líder de Turno',
+    '4.3 Encargos Trabalhistas', '4.3.1 INSS', '4.3.2 FGTS', '4.3.3 Provisões Trabalhistas',
+    '4.4 Benefícios', '4.4.1 Vale Transporte', '4.4.2 Alimentação', '4.4.3 Plano de Saúde',
+    '4.5 Pró-labore de Gestão (não sócio)', '4.5.1 Pró-labore Gerente Operacional', '4.6 Extras', '4.6.1 Horas Extras', '4.6.2 Freelancers',
+    '5. Despesas Administrativas', '5.1 Estrutura', '5.1.1 Aluguel', '5.1.2 Condomínio',
+    '5.2 Serviços Administrativos', '5.2.1 Contabilidade', '5.2.2 Internet / Telefonia', '5.2.3 Sistemas / PDV', '5.3 Materiais', '5.3.1 Material de Escritório',
+    '6. Despesas Operacionais', '6.1 Utilidades', '6.1.1 Energia Elétrica', '6.1.2 Água', '6.1.3 Gás',
+    '6.2 Manutenção', '6.2.1 Equipamentos', '6.2.2 Instalações', '6.3 Serviços Operacionais', '6.3.1 Limpeza', '6.3.2 Segurança', '6.3.3 Dedetização',
+    '6.4 Licenças e Taxas', '6.4.1 Alvará', '6.4.2 Vigilância Sanitária', '6.4.3 ECAD',
+    '7. Despesas Comerciais / Marketing', '7.1 Marketing Digital', '7.1.1 Anúncios Online', '7.1.2 Redes Sociais', '7.2 Promoções', '7.2.1 Eventos', '7.2.2 Ações Promocionais',
+    '8. Receitas Financeiras', '8.1 Juros Recebidos', '8.2 Cashback', '8.3 Rendimentos Bancários',
+    '9. Despesas Financeiras', '9.1 Taxas Bancárias', '9.2 Juros de Empréstimos', '9.3 Antecipação de Recebíveis', '9.4 Multas e Encargos',
+    '10. Impostos sobre o Lucro', '10.1 IRPJ', '10.2 CSLL',
+    '11. Remuneração e Retirada de Sócios (fora da DRE operacional)', '11.1 Pró-labore de Sócios', '11.2 Distribuição de Lucros', '11.3 Retiradas Eventuais'
   ];
 
   const fetchData = useCallback(async () => {
@@ -88,18 +110,22 @@ export const ContasList: React.FC = () => {
   };
 
   const getCategoriaColor = (categoria: string) => {
-    const colors: { [key: string]: string } = {
-      'Receita Bruta': 'bg-green-100 text-green-800',
-      'Deduções e Impostos': 'bg-red-100 text-red-800',
-      'Custo dos Produtos Vendidos': 'bg-orange-100 text-orange-800',
-      'Despesas Comerciais': 'bg-purple-100 text-purple-800',
-      'Despesas Administrativas': 'bg-blue-100 text-blue-800',
-      'Outras Despesas Operacionais': 'bg-gray-100 text-gray-800',
-      'Receitas Financeiras': 'bg-emerald-100 text-emerald-800',
-      'Despesas Financeiras': 'bg-pink-100 text-pink-800',
-      'Impostos sobre Lucro': 'bg-yellow-100 text-yellow-800'
-    };
-    return colors[categoria] || 'bg-gray-100 text-gray-800';
+    const m = String(categoria).match(/^\s*(\d+)/);
+    const top = m ? parseInt(m[1], 10) : 0;
+    switch (top) {
+      case 1: return 'bg-green-100 text-green-800';
+      case 2: return 'bg-red-100 text-red-800';
+      case 3: return 'bg-orange-100 text-orange-800';
+      case 4: return 'bg-purple-100 text-purple-800';
+      case 5: return 'bg-blue-100 text-blue-800';
+      case 6: return 'bg-gray-100 text-gray-800';
+      case 7: return 'bg-indigo-100 text-indigo-800';
+      case 8: return 'bg-emerald-100 text-emerald-800';
+      case 9: return 'bg-pink-100 text-pink-800';
+      case 10: return 'bg-yellow-100 text-yellow-800';
+      case 11: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const getEmpresaNome = (empresaId: string) => {
