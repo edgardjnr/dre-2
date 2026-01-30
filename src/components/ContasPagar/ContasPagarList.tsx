@@ -292,7 +292,7 @@ export const ContasPagarList: React.FC = () => {
       // Verificar se a conta existe e pertence ao usuário
       const { data: conta, error: fetchError } = await supabase
         .from('contas_a_pagar')
-        .select('id, user_id, fornecedor, descricao, lancamento_gerado_id')
+        .select('id, user_id, fornecedor, descricao, lancamento_gerado_id, foto_url')
         .eq('id', id)
         .single();
         
@@ -369,15 +369,48 @@ export const ContasPagarList: React.FC = () => {
         }
       }
       
-      // Remover fotos vinculadas se existirem
+      const extractStorageKey = (value: string): string | null => {
+        const url = String(value || '').trim();
+        if (!url) return null;
+        if (url.startsWith('data:')) return null;
+        if (url.startsWith('http')) {
+          const m = url.match(/\/contas-fotos\/(.+)$/);
+          return m?.[1] || null;
+        }
+        return url;
+      };
+
+      const { data: fotosData } = await supabase
+        .from('conta_pagar_fotos')
+        .select('foto_url')
+        .eq('conta_pagar_id', id);
+
+      const storageKeys: string[] = [];
+      for (const f of (fotosData || [])) {
+        const k = extractStorageKey((f as any).foto_url);
+        if (k) storageKeys.push(k);
+      }
+      if ((conta as any).foto_url) {
+        const k = extractStorageKey((conta as any).foto_url as string);
+        if (k) storageKeys.push(k);
+      }
+
+      if (storageKeys.length) {
+        const { error: storageDeleteError } = await supabase.storage
+          .from('contas-fotos')
+          .remove(storageKeys);
+        if (storageDeleteError) {
+          console.error('Erro ao remover imagens do storage:', storageDeleteError);
+        }
+      }
+
       const { error: deleteFotosError } = await supabase
         .from('conta_pagar_fotos')
         .delete()
         .eq('conta_pagar_id', id);
-        
+      
       if (deleteFotosError) {
         console.error('Erro ao remover fotos:', deleteFotosError);
-        // Continuar mesmo se houver erro ao remover fotos
       }
       
       // Executar a exclusão da conta

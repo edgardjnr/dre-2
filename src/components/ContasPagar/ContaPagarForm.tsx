@@ -683,8 +683,25 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         if (error) throw error;
         contaId = conta.id;
 
-        // Remover apenas fotos marcadas para exclusão
         if (photosToRemove.length > 0) {
+          const { data: fotosParaRemover, error: buscarFotosError } = await supabase
+            .from('conta_pagar_fotos')
+            .select('id, foto_url')
+            .in('id', photosToRemove);
+
+          if (buscarFotosError) throw buscarFotosError;
+
+          const keys = (fotosParaRemover || [])
+            .map(f => extractStorageKey(f.foto_url))
+            .filter((k): k is string => Boolean(k));
+
+          if (keys.length) {
+            const { error: storageDeleteError } = await supabase.storage
+              .from('contas-fotos')
+              .remove(keys);
+            if (storageDeleteError) throw storageDeleteError;
+          }
+
           const { error: removeError } = await supabase
             .from('conta_pagar_fotos')
             .delete()
