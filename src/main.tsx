@@ -75,7 +75,8 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator) {
   const registerSW = async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+      const registration = await navigator.serviceWorker.register(swUrl);
       console.log('SW registered: ', registration);
 
       // Force check for updates on load

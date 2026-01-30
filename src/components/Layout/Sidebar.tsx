@@ -117,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, 
                       {user?.email?.charAt(0).toUpperCase() || '?'}
                     </span>
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{user?.email || 'usuario@email.com'}</p>
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] text-gray-400 font-bold">Versão v1.1.4</p>
@@ -206,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, 
                       {user?.email?.charAt(0).toUpperCase() || '?'}
                     </span>
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{user?.email || 'usuario@email.com'}</p>
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] text-gray-400 font-bold">Versão v1.1.4</p>
