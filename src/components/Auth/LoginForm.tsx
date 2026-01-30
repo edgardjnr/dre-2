@@ -42,7 +42,7 @@ export const LoginForm: React.FC = () => {
             {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                     <strong className="font-bold">Erro! </strong>
-                    <span className="block sm:inline">{error.message === 'Invalid login credentials' ? 'Email ou senha inválidos.' : error.message}</span>
+                    <span className="block sm:inline">{error.message}</span>
                 </div>
             )}
             <div className="rounded-md shadow-sm space-y-4">

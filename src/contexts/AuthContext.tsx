@@ -203,7 +203,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (error) {
-        setError(error);
+        console.error('Erro detalhado do Supabase:', error);
+        
+        // Tratamento específico para erros comuns
+        if ((error as any).status === 503 || error.message?.includes('503')) {
+          setError(new Error('Serviço indisponível (503). O projeto Supabase pode estar pausado ou em manutenção. Verifique o painel do Supabase.'));
+        } else if ((error as any).status === 400 && error.message?.includes('Invalid login credentials')) {
+          setError(new Error('Email ou senha incorretos.'));
+        } else {
+          setError(error);
+        }
         return false;
       }
 
