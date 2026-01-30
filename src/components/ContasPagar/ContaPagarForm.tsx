@@ -537,11 +537,18 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   };
 
   // Função para remover uma imagem específica
-  const removePhoto = (index: number, isExisting: boolean = false) => {
+  const removePhoto = async (index: number, isExisting: boolean = false) => {
     if (isExisting) {
       const photoToRemove = existingPhotos[index];
       if (photoToRemove) {
-        setPhotosToRemove(prev => [...prev, photoToRemove.id]);
+        const key = extractStorageKey(photoToRemove.url);
+        if (key) {
+          await supabase.storage.from('contas-fotos').remove([key]);
+        }
+        await supabase
+          .from('conta_pagar_fotos')
+          .delete()
+          .eq('id', photoToRemove.id);
         setExistingPhotos(prev => prev.filter((_, i) => i !== index));
       }
     } else {
