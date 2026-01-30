@@ -13,6 +13,9 @@ export const LoginForm: React.FC = () => {
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
     const [resetMessage, setResetMessage] = useState('');
+    const devLoginEmail = import.meta.env.VITE_DEV_LOGIN_EMAIL as string | undefined;
+    const devLoginPassword = import.meta.env.VITE_DEV_LOGIN_PASSWORD as string | undefined;
+    const showDevLogin = Boolean(import.meta.env.DEV && devLoginEmail && devLoginPassword);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -108,6 +111,28 @@ export const LoginForm: React.FC = () => {
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Entrar'}
                 </button>
             </div>
+
+            {showDevLogin && (
+                <div>
+                    <button
+                        type="button"
+                        disabled={loading}
+                        onClick={async () => {
+                            setEmail(devLoginEmail!);
+                            setPassword(devLoginPassword!);
+                            const success = await signInWithEmail({ email: devLoginEmail!, password: devLoginPassword! });
+                            if (success) {
+                                setTimeout(() => {
+                                    navigate('/dashboard');
+                                }, 100);
+                            }
+                        }}
+                        className="group relative w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                        Entrar com usuário de teste (local)
+                    </button>
+                </div>
+            )}
 
             {/* Botão de instalação PWA */}
             <PWAInstallButton className="mt-4" />
