@@ -26,6 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const normalizedEmail = String(email).trim().toLowerCase()
+    const originHeader = Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin
+    const refererHeader = Array.isArray(req.headers.referer) ? req.headers.referer[0] : req.headers.referer
+    const originFromReferer = refererHeader ? new URL(refererHeader).origin : undefined
+    const appOrigin = originHeader || originFromReferer || process.env.APP_URL || 'https://dre.onebots.com.br'
 
     // Tentar localizar usuário existente por email via admin listUsers
     let userId: string | undefined
@@ -100,7 +104,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ success: false, error: linkError.message })
     }
 
-    res.status(200).json({ success: true, userId })
+    const { error: recoveryError } = await admin.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${appOrigin}/reset-password`
+    })
+    if (recoveryError) {
+      return res.status(200).json({ success: true, userId, recoveryEmailSent: false, recoveryError: recoveryError.message })
+    }
+
+    res.status(200).json({ success: true, userId, recoveryEmailSent: true })
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Server error' })
   }
