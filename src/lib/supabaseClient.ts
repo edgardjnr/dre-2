@@ -55,7 +55,7 @@ const createSupabaseClient = (): SupabaseClient => {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        storageKey: 'dre-auth-token' // Chave única para evitar conflitos
+        storageKey: `dre-auth-token-${supabaseUrl.split('//')[1].split('.')[0]}` // Chave única baseada no projeto para evitar conflitos
       },
       global: {
         headers: {
