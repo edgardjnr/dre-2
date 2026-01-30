@@ -58,17 +58,17 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '' }) =
     const buttonVariants = {
         idle: {
             backgroundColor: "rgb(59, 130, 246)",
-            color: "white",
+            color: "#ffffff",
             scale: 1,
         },
         installing: {
             backgroundColor: "rgb(168, 85, 247)",
-            color: "white",
+            color: "#ffffff",
             scale: 1,
         },
         installed: {
             backgroundColor: "rgb(34, 197, 94)",
-            color: "white",
+            color: "#ffffff",
             scale: [1, 1.1, 1],
             transition: {
                 duration: 0.2,
@@ -107,8 +107,8 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '' }) =
                                 <span
                                     className={cn(
                                         "spark mask-gradient absolute inset-0 h-[100%] w-[100%] animate-flip overflow-hidden rounded-full",
-                                        "[mask:linear-gradient(white,_transparent_50%)] before:absolute before:aspect-square before:w-[200%] before:bg-[conic-gradient(from_0deg,transparent_0_340deg,white_360deg)]",
-                                        "before:rotate-[-90deg] before:animate-rotate",
+                            "[mask:linear-gradient(#ffffff,_transparent_50%)] before:absolute before:aspect-square before:w-[200%] before:bg-[conic-gradient(from_0deg,transparent_0_340deg,#ffffff_360deg)]",
+                            "before:rotate-[-90deg] before:animate-rotate",
                                         "before:content-[''] before:[inset:0_auto_auto_50%] before:[translate:-50%_-15%]"
                                     )}
                                 />
