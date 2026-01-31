@@ -43,10 +43,9 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       return;
     }
 
-    const maxRetries = 1;
-    const timeoutMs = Number(import.meta.env.VITE_COMPANIES_TIMEOUT_MS) || 12000;
+    
 
-    const loadCompaniesDirect = async () => {
+    const loadCompaniesDirect = async (): Promise<Company[]> => {
       const { data: ownedCompanies, error: ownedError } = await supabase
         .from('empresas')
         .select('id, razao_social')
@@ -89,73 +88,20 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       });
 
       const merged = Array.from(mergedMap.values());
-      setCompanies(merged);
-
-      if (merged.length > 0 && !selectedCompany) {
-        setSelectedCompany(merged[0].id);
-      }
+      return merged;
     };
     
     try {
       console.log('🏢 [DEBUG] Buscando empresas para usuário:', user.id, 'tentativa:', retryCount + 1);
-      
-      // Timeout para a busca de empresas (ajustável via VITE_COMPANIES_TIMEOUT_MS)
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout na busca de empresas')), timeoutMs);
-      });
-      
-      const companiesPromise = supabase
-        .rpc('get_user_companies');
-      
-      const { data, error } = await Promise.race([companiesPromise, timeoutPromise]);
-
-      if (error) throw error;
-
-      setCompanies((data || []).map((row: CompanyRow) => ({
-        id: row.id,
-        razaoSocial: row.razao_social
-      })));
-      
-      // Auto-selecionar a primeira empresa se não houver uma selecionada
-      if (data && data.length > 0 && !selectedCompany) {
-        setSelectedCompany(data[0].id);
+      const merged = await loadCompaniesDirect();
+      setCompanies(merged);
+      if (merged.length > 0 && !selectedCompany) {
+        setSelectedCompany(merged[0].id);
       }
-      
-      console.log('✅ [DEBUG] Empresas carregadas com sucesso:', data?.length || 0);
+      console.log('✅ [DEBUG] Empresas carregadas com sucesso:', merged.length);
     } catch (error) {
-      console.error('💥 [DEBUG] Erro ao carregar empresas (tentativa', retryCount + 1, '):', error);
-      
-      // Verificar se é erro de timeout ou conectividade
-      const isTimeoutError = error instanceof Error && error.message.includes('Timeout');
-      const isNetworkError = error instanceof Error && (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch'));
-
-      // Timeout: partir direto para o fallback sem múltiplas tentativas
-      if (isTimeoutError) {
-        console.log('⏱️ [DEBUG] Timeout na RPC, usando fallback imediato...');
-        try {
-          await loadCompaniesDirect();
-        } catch (fallbackError) {
-          console.error('💥 [DEBUG] Erro ao carregar empresas via fallback:', fallbackError);
-          setCompanies([]);
-        }
-        return;
-      }
-
-      // Erro de rede: tentar uma vez com backoff, depois fallback
-      if (isNetworkError && retryCount < maxRetries) {
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000);
-        console.log(`🔄 [DEBUG] Tentando buscar empresas novamente em ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchCompanies(retryCount + 1);
-      }
-
-      // Outros erros: usar fallback
-      try {
-        await loadCompaniesDirect();
-      } catch (fallbackError) {
-        console.error('💥 [DEBUG] Erro ao carregar empresas via fallback:', fallbackError);
-        setCompanies([]);
-      }
+      console.error('💥 [DEBUG] Erro ao carregar empresas:', error);
+      setCompanies([]);
     } finally {
       setLoading(false);
     }
