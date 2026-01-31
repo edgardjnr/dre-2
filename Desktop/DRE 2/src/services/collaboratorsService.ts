@@ -74,8 +74,8 @@ export class CollaboratorsService {
     }));
   }
 
-  // Criar convite usando RPC e enviar email
-  static async inviteCollaborator(request: InviteCollaboratorRequest): Promise<{ success: boolean; error?: string; invitation?: CompanyInvitation }> {
+  // Criar convite usando RPC
+  static async inviteCollaborator(request: InviteCollaboratorRequest): Promise<{ success: boolean; error?: string; invitation?: CompanyInvitation; inviteLink?: string; inviteId?: string }> {
     try {
       // Criar convite no banco de dados
       const { data, error } = await supabase
@@ -118,10 +118,15 @@ export class CollaboratorsService {
       console.log('✅ Convite criado:', invitation);
       console.log('🔑 Token gerado:', invitation.token);
   
-      // Não usar supabase.auth.admin.inviteUserByEmail para evitar erro de usuário já registrado
-      // O convite será enviado manualmente ou via link direto
+      // Gerar link de convite
+      const inviteLink = this.generateInvitationLink(invitation.token);
   
-      return { success: true, invitation };
+      return { 
+        success: true, 
+        invitation,
+        inviteLink,
+        inviteId: invitation.token
+      };
       
     } catch (error: unknown) {
       console.error('💥 Erro ao criar convite:', error);
@@ -141,11 +146,55 @@ export class CollaboratorsService {
 
   // Remover colaborador
   static async removeCollaborator(collaboratorId: string): Promise<void> {
-    const { data, error } = await supabase
-      .rpc('remove_company_collaborator', { p_collaborator_id: collaboratorId });
+    const { data: collaboratorData, error: collaboratorError } = await supabase
+      .from('company_collaborators')
+      .select('id, user_id, company_id')
+      .eq('id', collaboratorId)
+      .single();
 
-    if (error) throw error;
-    if (!data) throw new Error('Colaborador não encontrado ou não pôde ser removido');
+    if (collaboratorError || !collaboratorData?.user_id) {
+      throw new Error('Colaborador não encontrado ou não pôde ser removido');
+    }
+
+    const { data, error } = await supabase
+      .from('company_collaborators')
+      .delete()
+      .eq('id', collaboratorId)
+      .select('id');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('Colaborador não encontrado ou não pôde ser removido');
+    }
+
+    const { count, error: countError } = await supabase
+      .from('company_collaborators')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', collaboratorData.user_id);
+
+    if (countError) {
+      throw new Error(countError.message);
+    }
+
+    if (!count || count === 0) {
+      const { data: deleteData, error: deleteError } = await supabase.functions.invoke('delete-auth-user', {
+        body: {
+          userId: collaboratorData.user_id,
+          companyId: collaboratorData.company_id,
+        },
+      });
+
+      if (deleteError) {
+        throw new Error(deleteError.message);
+      }
+
+      if (!deleteData?.success) {
+        throw new Error(deleteData?.error || 'Falha ao excluir usuário');
+      }
+    }
   }
 
   // Atualizar role do colaborador

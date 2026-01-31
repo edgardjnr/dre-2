@@ -2,15 +2,22 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+const isValidSupabaseUrl = (url?: string): boolean => {
+  if (!url || url === 'your-project-url.supabase.co') return false;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.supabase.co');
+  } catch {
+    return false;
+  }
+};
 
 // Singleton para evitar múltiplas instâncias
 let supabaseInstance: SupabaseClient | null = null;
 
 // Check if environment variables are properly configured
-if (!supabaseUrl || !supabaseAnonKey || 
-    supabaseUrl === 'your-project-url.supabase.co' || 
-    supabaseAnonKey === 'your-anon-key-here') {
+if (!isValidSupabaseUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey === 'your-anon-key-here') {
   console.error('⚠️ Supabase configuration missing or using placeholder values');
   console.error('Please configure your .env file with actual Supabase credentials:');
   console.error('VITE_SUPABASE_URL=https://your-project-id.supabase.co');
@@ -24,9 +31,7 @@ const createSupabaseClient = (): SupabaseClient => {
     return supabaseInstance;
   }
 
-  if (!supabaseUrl || !supabaseAnonKey || 
-      supabaseUrl === 'your-project-url.supabase.co' || 
-      supabaseAnonKey === 'your-anon-key-here') {
+  if (!isValidSupabaseUrl(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey === 'your-anon-key-here') {
     
     // Create a mock client that will show an error message instead of crashing
     supabaseInstance = {
@@ -50,16 +55,20 @@ const createSupabaseClient = (): SupabaseClient => {
     } as SupabaseClient;
   } else {
     // Criar apenas uma instância do cliente Supabase com configurações otimizadas
+    const parsedUrl = new URL(supabaseUrl);
+    const projectId = parsedUrl.hostname.split('.')[0];
+
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        storageKey: 'dre-auth-token' // Chave única para evitar conflitos
+        storageKey: `dre-auth-token-${projectId}`
       },
       global: {
         headers: {
-          'X-Client-Info': 'dre-system'
+          'X-Client-Info': 'dre-system',
+          apikey: supabaseAnonKey
         }
       },
       db: {
