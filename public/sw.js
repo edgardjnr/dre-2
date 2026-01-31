@@ -20,8 +20,7 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
-  // Não interceptar requisições para APIs externas
-  if (event.request.url.includes('supabase.co/functions/v1/')) {
+  if (event.request.url.includes('supabase.co')) {
     return;
   }
   // Evitar cache para assets de build do Vite (sempre rede)
@@ -52,9 +51,7 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(event.request).catch(error => {
-          console.log('Fetch falhou:', error);
-          // Retornar uma resposta de erro personalizada
+        return fetch(event.request).catch(() => {
           return new Response(JSON.stringify({ error: 'Falha na conexão de rede' }), {
             headers: { 'Content-Type': 'application/json' },
             status: 503
