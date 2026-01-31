@@ -29,11 +29,11 @@ The login button was not working because:
 
 Current `.env` configuration:
 ```
-VITE_SUPABASE_URL=https://lrqlzohhhpddxarmfzct.supabase.co
+VITE_SUPABASE_URL=https://iqzobejingchcntbplcb.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Status**: ✅ **PROPERLY CONFIGURED** with real credentials
+**Status**: ✅ **PROPERLY CONFIGURED** with real project URL
 
 ## How to Test the Login
 
