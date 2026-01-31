@@ -15,6 +15,8 @@ interface CompanyContextType {
   refreshCompanies: () => Promise<void>;
 }
 
+type CompanyRow = { id: string; razao_social: string };
+
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export const useCompany = () => {
@@ -41,7 +43,8 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       return;
     }
 
-    const maxRetries = 2;
+    const maxRetries = 1;
+    const timeoutMs = Number(import.meta.env.VITE_COMPANIES_TIMEOUT_MS) || 12000;
 
     const loadCompaniesDirect = async () => {
       const { data: ownedCompanies, error: ownedError } = await supabase
@@ -96,9 +99,9 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
     try {
       console.log('🏢 [DEBUG] Buscando empresas para usuário:', user.id, 'tentativa:', retryCount + 1);
       
-      // Timeout para a busca de empresas
+      // Timeout para a busca de empresas (ajustável via VITE_COMPANIES_TIMEOUT_MS)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout na busca de empresas')), 5000);
+        setTimeout(() => reject(new Error('Timeout na busca de empresas')), timeoutMs);
       });
       
       const companiesPromise = supabase
@@ -108,7 +111,7 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
 
       if (error) throw error;
 
-      setCompanies((data || []).map((row: any) => ({
+      setCompanies((data || []).map((row: CompanyRow) => ({
         id: row.id,
         razaoSocial: row.razao_social
       })));
@@ -125,15 +128,28 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       // Verificar se é erro de timeout ou conectividade
       const isTimeoutError = error instanceof Error && error.message.includes('Timeout');
       const isNetworkError = error instanceof Error && (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch'));
-      
-      // Retry logic apenas para erros de timeout ou rede
-      if (retryCount < maxRetries && (isTimeoutError || isNetworkError)) {
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Backoff exponencial
+
+      // Timeout: partir direto para o fallback sem múltiplas tentativas
+      if (isTimeoutError) {
+        console.log('⏱️ [DEBUG] Timeout na RPC, usando fallback imediato...');
+        try {
+          await loadCompaniesDirect();
+        } catch (fallbackError) {
+          console.error('💥 [DEBUG] Erro ao carregar empresas via fallback:', fallbackError);
+          setCompanies([]);
+        }
+        return;
+      }
+
+      // Erro de rede: tentar uma vez com backoff, depois fallback
+      if (isNetworkError && retryCount < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000);
         console.log(`🔄 [DEBUG] Tentando buscar empresas novamente em ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return fetchCompanies(retryCount + 1);
       }
-      
+
+      // Outros erros: usar fallback
       try {
         await loadCompaniesDirect();
       } catch (fallbackError) {
