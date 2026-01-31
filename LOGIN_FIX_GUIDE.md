@@ -19,12 +19,6 @@ The login button was not working because:
 - ✅ Better error handling with console logging
 - ✅ Proper success/failure feedback
 
-### 3. Created Connection Test (`src/components/SupabaseConnectionTest.tsx`)
-- ✅ Comprehensive Supabase connection testing
-- ✅ Tests authentication, database, and configuration
-- ✅ Can create test users for debugging
-- ✅ Clear visual feedback on connection status
-
 ## Supabase Configuration Status ✅
 
 Current `.env` configuration:
@@ -37,19 +31,13 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## How to Test the Login
 
-### Option 1: Use Connection Test Tool
-1. Navigate to: `http://localhost:5173/test-connection`
-2. Click \"Criar Usuário Teste\" to create a test user
-3. Use credentials: `test@example.com` / `test123456`
-4. Go back to login page and test
-
-### Option 2: Create User via Registration
+### Option 1: Create User via Registration
 1. Go to `/register`
 2. Fill out the registration form
 3. Check email for confirmation (if email is configured)
 4. Return to login and use the credentials
 
-### Option 3: Check Database Directly
+### Option 2: Check Database Directly
 1. Go to your Supabase dashboard
 2. Check the \"Authentication\" section for existing users
 3. Use any existing user credentials
@@ -81,10 +69,9 @@ Look for these messages:
 3. Verify users exist and are confirmed
 
 ### Test Connection Status
-Visit: `http://localhost:5173/test-connection`
-- Should show all green checkmarks
-- Database connection should be successful
-- Auth service should be working
+- Use the Supabase dashboard to confirm:
+  - Auth users exist and are confirmed
+  - Tables/migrations are present (e.g. `profiles`)
 
 ## Common Issues & Solutions
 
@@ -112,8 +99,7 @@ Visit: `http://localhost:5173/test-connection`
 ## Files Modified
 - ✅ `src/contexts/AuthContext.tsx` - Fixed authentication logic
 - ✅ `src/components/Auth/LoginForm.tsx` - Added navigation
-- ✅ `src/components/SupabaseConnectionTest.tsx` - New test component
-- ✅ `src/main.tsx` - Added test route
+- ✅ `src/main.tsx` - Router configuration
 
 ## Quick Test Commands
 
@@ -128,8 +114,7 @@ curl -I http://localhost:5173
 
 ### Browser testing:
 1. `http://localhost:5173` → Should show login/config screen
-2. `http://localhost:5173/test-connection` → Connection test tool
-3. `http://localhost:5173/register` → Registration form
+2. `http://localhost:5173/register` → Registration form
 
 ## Status: READY FOR TESTING ✅
 

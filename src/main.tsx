@@ -23,7 +23,6 @@ import { ReportsList } from './components/Relatorios/ReportsList.tsx';
 import { ConfiguracoesPage } from './components/Configuracoes/ConfiguracoesPage.tsx';
 
 import { AcceptInvitationDisabled } from './components/Convites/AcceptInvitationDisabled';
-import { SupabaseConnectionTest } from './components/SupabaseConnectionTest.tsx';
 import SplashScreenTest from './components/ui/SplashScreenTest.tsx';
 
 createRoot(document.getElementById('root')!).render(
@@ -36,7 +35,6 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/accept-invitation/:token" element={<AcceptInvitationDisabled />} />
-          <Route path="/test-connection" element={<SupabaseConnectionTest />} />
           <Route path="/test-splash" element={<SplashScreenTest />} />
           
           {/* Authenticated Routes */}
