@@ -7,6 +7,7 @@ interface LancamentoFormProps {
   lancamento?: Lancamento | null;
   empresas: Empresa[];
   contas: ContaContabil[];
+  fixedTipo?: Lancamento['tipo'];
   onSave: () => void;
   onClose: () => void;
 }
@@ -15,6 +16,7 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
   lancamento, 
   empresas, 
   contas, 
+  fixedTipo,
   onSave, 
   onClose 
 }) => {
@@ -26,7 +28,7 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
     data: new Date().toISOString().split('T')[0],
     descricao: '',
     valor: 0,
-    tipo: 'Débito' as 'Débito' | 'Crédito',
+    tipo: (fixedTipo || 'Débito') as 'Débito' | 'Crédito',
   });
 
   const [formData, setFormData] = useState(getInitialState());
@@ -62,7 +64,7 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
         data: lancamento.data ? new Date(lancamento.data + 'T00:00:00').toISOString().split('T')[0] : '',
         descricao: lancamento.descricao || '',
         valor: valor,
-        tipo: lancamento.tipo || 'Débito',
+        tipo: fixedTipo || lancamento.tipo || 'Débito',
       });
       setCategoriaDre(contas.find(c => c.id === lancamento.contaId)?.categoria || '');
       setValorFormatado(formatCurrencyInput(valor));
@@ -71,7 +73,14 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
       setValorFormatado('0,00');
       setCategoriaDre('');
     }
-  }, [lancamento, empresas, contas]);
+  }, [lancamento, empresas, contas, fixedTipo]);
+
+  useEffect(() => {
+    if (!fixedTipo) return;
+    if (formData.tipo !== fixedTipo) {
+      setFormData(prev => ({ ...prev, tipo: fixedTipo }));
+    }
+  }, [fixedTipo, formData.tipo]);
   
   // Reset contaId if empresa changes and the current contaId is not valid
   useEffect(() => {
@@ -358,35 +367,37 @@ export const LancamentoForm: React.FC<LancamentoFormProps> = ({
         />
       </div>
       
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Tipo *
-        </label>
-        <div className="mt-2 space-x-6">
-          <label className="inline-flex items-center">
-            <input 
-              type="radio" 
-              name="tipo" 
-              value="Débito" 
-              checked={formData.tipo === 'Débito'} 
-              onChange={handleChange} 
-              className="form-radio text-red-600 focus:ring-red-500"
-            />
-            <span className="ml-2 text-gray-700">Débito</span>
+      {!fixedTipo && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tipo *
           </label>
-          <label className="inline-flex items-center">
-            <input 
-              type="radio" 
-              name="tipo" 
-              value="Crédito" 
-              checked={formData.tipo === 'Crédito'} 
-              onChange={handleChange} 
-              className="form-radio text-green-600 focus:ring-green-500"
-            />
-            <span className="ml-2 text-gray-700">Crédito</span>
-          </label>
+          <div className="mt-2 space-x-6">
+            <label className="inline-flex items-center">
+              <input 
+                type="radio" 
+                name="tipo" 
+                value="Débito" 
+                checked={formData.tipo === 'Débito'} 
+                onChange={handleChange} 
+                className="form-radio text-red-600 focus:ring-red-500"
+              />
+              <span className="ml-2 text-gray-700">Débito</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input 
+                type="radio" 
+                name="tipo" 
+                value="Crédito" 
+                checked={formData.tipo === 'Crédito'} 
+                onChange={handleChange} 
+                className="form-radio text-green-600 focus:ring-green-500"
+              />
+              <span className="ml-2 text-gray-700">Crédito</span>
+            </label>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex justify-end space-x-3 pt-4 border-t mt-6">
         <button 

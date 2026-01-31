@@ -189,12 +189,58 @@ export class CollaboratorsService {
   }
 
   // Remover colaborador
-  static async removeCollaborator(collaboratorId: string): Promise<void> {
-    const { data, error } = await supabase
-      .rpc('remove_company_collaborator', { p_collaborator_id: collaboratorId });
+  static async removeCollaborator(collaboratorId: string): Promise<{ success: boolean; error?: string }> {
+    const { data: collaboratorData, error: collaboratorError } = await supabase
+      .from('company_collaborators')
+      .select('id, user_id, company_id')
+      .eq('id', collaboratorId)
+      .single();
 
-    if (error) throw error;
-    if (!data) throw new Error('Colaborador não encontrado ou não pôde ser removido');
+    if (collaboratorError || !collaboratorData?.user_id) {
+      return { success: false, error: 'Colaborador não encontrado ou não pôde ser removido' };
+    }
+
+    const { data, error } = await supabase
+      .from('company_collaborators')
+      .delete()
+      .eq('id', collaboratorId)
+      .select('id');
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (!data || data.length === 0) {
+      return { success: false, error: 'Colaborador não encontrado ou não pôde ser removido' };
+    }
+
+    const { count, error: countError } = await supabase
+      .from('company_collaborators')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', collaboratorData.user_id);
+
+    if (countError) {
+      return { success: false, error: countError.message };
+    }
+
+    if (!count || count === 0) {
+      const { data: deleteData, error: deleteError } = await supabase.functions.invoke('delete-auth-user', {
+        body: {
+          userId: collaboratorData.user_id,
+          companyId: collaboratorData.company_id,
+        },
+      });
+
+      if (deleteError) {
+        return { success: false, error: deleteError.message };
+      }
+
+      if (!deleteData?.success) {
+        return { success: false, error: deleteData?.error || 'Falha ao excluir usuário' };
+      }
+    }
+
+    return { success: true };
   }
 
   // Atualizar role do colaborador

@@ -10,7 +10,19 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { AlertModal } from '../ui/AlertModal';
 import { useModal } from '../../hooks/useModal';
 
-export const LancamentosList: React.FC = () => {
+interface LancamentosListProps {
+  title?: string;
+  newButtonLabel?: string;
+  tipoFiltro?: Lancamento['tipo'];
+  fixedTipo?: Lancamento['tipo'];
+}
+
+export const LancamentosList: React.FC<LancamentosListProps> = ({
+  title = 'Lançamentos Contábeis',
+  newButtonLabel = 'Novo Lançamento',
+  tipoFiltro,
+  fixedTipo
+}) => {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [contas, setContas] = useState<ContaContabil[]>([]);
@@ -324,6 +336,7 @@ export const LancamentosList: React.FC = () => {
     if (filtroEmpresa && l.empresaId !== filtroEmpresa) return false;
     if (filtroDataInicio && l.data < filtroDataInicio) return false;
     if (filtroDataFim && l.data > filtroDataFim) return false;
+    if (tipoFiltro && l.tipo !== tipoFiltro) return false;
     
     // Filtro de pesquisa por texto
     if (termoPesquisa) {
@@ -357,7 +370,7 @@ export const LancamentosList: React.FC = () => {
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Header Responsivo */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Lançamentos Contábeis</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <button 
             onClick={() => setShowFilters(!showFilters)}
@@ -371,7 +384,7 @@ export const LancamentosList: React.FC = () => {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2 touch-manipulation"
           >
             <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="text-sm sm:text-base">Novo Lançamento</span>
+            <span className="text-sm sm:text-base">{newButtonLabel}</span>
           </button>
         </div>
       </div>
@@ -574,6 +587,7 @@ export const LancamentosList: React.FC = () => {
           lancamento={editingLancamento}
           empresas={empresas}
           contas={contas}
+          fixedTipo={fixedTipo}
           onSave={handleSave}
           onClose={() => setShowModal(false)}
         />

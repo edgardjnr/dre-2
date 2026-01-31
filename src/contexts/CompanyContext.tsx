@@ -42,6 +42,56 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
     }
 
     const maxRetries = 2;
+
+    const loadCompaniesDirect = async () => {
+      const { data: ownedCompanies, error: ownedError } = await supabase
+        .from('empresas')
+        .select('id, razao_social')
+        .eq('user_id', user.id)
+        .eq('ativa', true)
+        .order('razao_social');
+
+      if (ownedError) throw ownedError;
+
+      const { data: collaboratorRows, error: collaboratorError } = await supabase
+        .from('company_collaborators')
+        .select('company_id')
+        .eq('user_id', user.id);
+
+      if (collaboratorError) throw collaboratorError;
+
+      const collaboratorCompanyIds = Array.from(
+        new Set((collaboratorRows || []).map((row: { company_id: string }) => row.company_id).filter(Boolean))
+      );
+
+      let collaboratorCompanies: { id: string; razao_social: string }[] = [];
+      if (collaboratorCompanyIds.length > 0) {
+        const { data: collaboratorData, error: collaboratorDataError } = await supabase
+          .from('empresas')
+          .select('id, razao_social')
+          .in('id', collaboratorCompanyIds)
+          .eq('ativa', true)
+          .order('razao_social');
+
+        if (collaboratorDataError) throw collaboratorDataError;
+        collaboratorCompanies = (collaboratorData || []) as { id: string; razao_social: string }[];
+      }
+
+      const mergedMap = new Map<string, { id: string; razaoSocial: string }>();
+      (ownedCompanies || []).forEach((row: { id: string; razao_social: string }) => {
+        mergedMap.set(row.id, { id: row.id, razaoSocial: row.razao_social });
+      });
+      collaboratorCompanies.forEach((row) => {
+        mergedMap.set(row.id, { id: row.id, razaoSocial: row.razao_social });
+      });
+
+      const merged = Array.from(mergedMap.values());
+      setCompanies(merged);
+
+      if (merged.length > 0 && !selectedCompany) {
+        setSelectedCompany(merged[0].id);
+      }
+    };
     
     try {
       console.log('🏢 [DEBUG] Buscando empresas para usuário:', user.id, 'tentativa:', retryCount + 1);
@@ -84,8 +134,12 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
         return fetchCompanies(retryCount + 1);
       }
       
-      // Se falhou após todas as tentativas, manter array vazio
-      setCompanies([]);
+      try {
+        await loadCompaniesDirect();
+      } catch (fallbackError) {
+        console.error('💥 [DEBUG] Erro ao carregar empresas via fallback:', fallbackError);
+        setCompanies([]);
+      }
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import PWAInstallButton from '../PWAInstallButton';
 
 
 export const LoginForm: React.FC = () => {
@@ -134,8 +133,7 @@ export const LoginForm: React.FC = () => {
                 </div>
             )}
 
-            {/* Botão de instalação PWA */}
-            <PWAInstallButton className="mt-4" />
+            
             
             {/* Link para cadastro */}
             <div className="text-center mt-4">

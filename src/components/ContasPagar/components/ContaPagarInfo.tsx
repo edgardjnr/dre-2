@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Building, FileText, DollarSign, Calendar, Hash, Copy, Check, Image } from 'lucide-react';
+import { Building, FileText, DollarSign, Calendar, Hash, Copy, Check, Image, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ContaPagar, ContaContabil } from '../../../types';
 import { supabase } from '../../../lib/supabaseClient';
 
@@ -146,6 +146,19 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    if (status === 'paga') return <CheckCircle className="w-4 h-4 text-green-600" />;
+    if (status === 'vencida') return <AlertTriangle className="w-4 h-4 text-red-600" />;
+    return <Clock className="w-4 h-4 text-yellow-600" />;
+  };
+
+  const getStatusChipClass = (status: string) => {
+    if (status === 'paga') return 'bg-green-100 text-green-800';
+    if (status === 'vencida') return 'bg-red-100 text-red-800';
+    if (status === 'cancelada') return 'bg-gray-100 text-gray-800';
+    return 'bg-yellow-100 text-yellow-800';
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -184,6 +197,16 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
               Data de Vencimento
             </label>
             <p className="text-gray-900">{format(formatDateForDisplay(conta.dataVencimento), 'dd/MM/yyyy')}</p>
+          </div>
+
+          <div>
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+              {getStatusIcon(conta.status)}
+              <span className="ml-2">Status</span>
+            </label>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusChipClass(conta.status)}`}>
+              {conta.status === 'pendente' ? 'Pendente' : conta.status === 'paga' ? 'Paga' : conta.status === 'vencida' ? 'Vencida' : 'Cancelada'}
+            </span>
           </div>
 
           {conta.dataPagamento && (

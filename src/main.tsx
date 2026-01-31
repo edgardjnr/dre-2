@@ -7,7 +7,6 @@ import './index.css';
 // Auth
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import ProtectedRoute from './components/ProtectedRoute.tsx';
-import PWAInstallProvider from './components/PWAInstallProvider.tsx';
 
 // Pages
 import LoginPage from './pages/LoginPage.tsx';
@@ -17,8 +16,8 @@ import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
 import { Dashboard } from './components/Dashboard/Dashboard.tsx';
 import { EmpresasList } from './components/Empresas/EmpresasList.tsx';
 import { ContasList } from './components/Contas/ContasList.tsx';
-import { LancamentosList } from './components/Lancamentos/LancamentosList.tsx';
 import { ContasPagarList } from './components/ContasPagar/ContasPagarList.tsx';
+import { LancamentosList } from './components/Lancamentos/LancamentosList.tsx';
 import { DREReport } from './components/DRE/DREReport.tsx';
 import { ReportsList } from './components/Relatorios/ReportsList.tsx';
 import { ConfiguracoesPage } from './components/Configuracoes/ConfiguracoesPage.tsx';
@@ -31,7 +30,6 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <PWAInstallProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/activation" element={<ActivationCodePage />} />
@@ -54,8 +52,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="empresas" element={<EmpresasList />} />
             <Route path="contas" element={<ContasList />} />
-            <Route path="lancamentos" element={<LancamentosList />} />
+            <Route path="lancamentos" element={<Navigate to="/contas-pagar" replace />} />
             <Route path="contas-pagar" element={<ContasPagarList />} />
+            <Route path="entradas" element={<LancamentosList title="Entradas" newButtonLabel="Nova Entrada" tipoFiltro="Crédito" fixedTipo="Crédito" />} />
             <Route path="dre" element={<DREReport />} />
             <Route path="relatorios" element={<ReportsList />} />
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
@@ -65,45 +64,10 @@ createRoot(document.getElementById('root')!).render(
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-        </PWAInstallProvider>
+        
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 );
 
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-  const registerSW = async () => {
-    try {
-      const swUrl = `${import.meta.env.BASE_URL}sw.js`;
-      const registration = await navigator.serviceWorker.register(swUrl);
-      console.log('SW registered: ', registration);
-
-      // Force check for updates on load
-      try { registration.update(); } catch {}
-
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Auto-apply the new version without prompt
-            newWorker.postMessage({ type: 'SKIP_WAITING' });
-          }
-        });
-      });
-    } catch (registrationError) {
-      console.log('SW registration failed: ', registrationError);
-    }
-  };
-
-  window.addEventListener('load', registerSW);
-
-  // Reload once the new SW takes control
-  let reloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloaded) return;
-    reloaded = true;
-    window.location.reload();
-  });
-}
+ 

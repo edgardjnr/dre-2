@@ -55,7 +55,7 @@ export function useEditConta(
     initialDataPagamento ? format(formatDateForDisplay(initialDataPagamento), 'yyyy-MM-dd') : ''
   );
   
-  const { gerarLancamentoDREAutomatico } = useDRELancamento(onUpdate);
+  const { sincronizarLancamentoDRE } = useDRELancamento(onUpdate);
 
   const resetFields = () => {
     setNewStatus(initialStatus);
@@ -116,38 +116,36 @@ export function useEditConta(
 
       if (error) throw error;
 
-      // Se mudando para "paga", gerar lançamento DRE automaticamente com a data escolhida
-      if (newStatus === 'paga') {
-        // Buscar os dados atualizados da conta para gerar o lançamento
-        const { data: contaData, error: fetchError } = await supabase
-          .from('contas_a_pagar')
-          .select('*')
-          .eq('id', contaId)
-          .single();
+      const { data: contaData, error: fetchError } = await supabase
+        .from('contas_a_pagar')
+        .select('*')
+        .eq('id', contaId)
+        .single();
 
-        if (!fetchError && contaData) {
-          const conta = {
-            id: contaData.id,
-            empresaId: contaData.empresa_id,
-            fornecedor: contaData.fornecedor,
-            descricao: contaData.descricao,
-            valor: contaData.valor, // Usar o valor atualizado
-            dataVencimento: contaData.data_vencimento,
-            dataPagamento: contaData.data_pagamento,
-            status: contaData.status,
-            observacoes: contaData.observacoes,
-            numeroDocumento: contaData.numero_documento,
-            fotoUrl: contaData.foto_url,
-            fotoNome: contaData.foto_nome,
-            fotos: [],
-            contaContabilId: contaData.conta_contabil_id,
-            lancamentoGeradoId: contaData.lancamento_gerado_id,
-            created_at: contaData.created_at,
-            updated_at: contaData.updated_at
-          };
-          
-          await gerarLancamentoDREAutomatico(conta);
-        }
+      if (fetchError) throw fetchError;
+
+      if (contaData) {
+        const conta = {
+          id: contaData.id,
+          empresaId: contaData.empresa_id,
+          fornecedor: contaData.fornecedor,
+          descricao: contaData.descricao,
+          valor: contaData.valor,
+          dataVencimento: contaData.data_vencimento,
+          dataPagamento: contaData.data_pagamento,
+          status: contaData.status,
+          observacoes: contaData.observacoes,
+          numeroDocumento: contaData.numero_documento,
+          fotoUrl: contaData.foto_url,
+          fotoNome: contaData.foto_nome,
+          fotos: [],
+          contaContabilId: contaData.conta_contabil_id,
+          lancamentoGeradoId: contaData.lancamento_gerado_id,
+          created_at: contaData.created_at,
+          updated_at: contaData.updated_at
+        };
+
+        await sincronizarLancamentoDRE(conta);
       }
 
       setEditing(false);

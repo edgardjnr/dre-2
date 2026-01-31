@@ -5,18 +5,13 @@ import { EditContaForm } from './EditContaForm';
 
 interface StatusControlProps {
   currentStatus: ContaPagarStatus;
-  currentValor: number;
   currentDataVencimento: string;
   editing: boolean;
   newStatus: ContaPagarStatus;
-  newValor: string;
-  newDataVencimento: string;
   newDataPagamento?: string;
   loading: boolean;
   onStartEdit: () => void;
   onStatusChange: (status: ContaPagarStatus) => void;
-  onValorChange: (valor: string) => void;
-  onDataVencimentoChange: (data: string) => void;
   onDataPagamentoChange?: (data: string) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -45,18 +40,13 @@ const getStatusLabel = (status: string) => {
 
 export function StatusControl({
   currentStatus,
-  currentValor,
   currentDataVencimento,
   editing,
   newStatus,
-  newValor,
-  newDataVencimento,
   newDataPagamento,
   loading,
   onStartEdit,
   onStatusChange,
-  onValorChange,
-  onDataVencimentoChange,
   onDataPagamentoChange,
   onSave,
   onCancel
@@ -66,15 +56,10 @@ export function StatusControl({
       <div className="w-full">
         <EditContaForm
           currentStatus={currentStatus}
-          currentValor={currentValor}
           currentDataVencimento={currentDataVencimento}
           newStatus={newStatus}
-          newValor={newValor}
-          newDataVencimento={newDataVencimento}
           loading={loading}
           onStatusChange={onStatusChange}
-          onValorChange={onValorChange}
-          onDataVencimentoChange={onDataVencimentoChange}
           onSave={onSave}
           onCancel={onCancel}
           // novas props

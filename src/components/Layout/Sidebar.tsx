@@ -3,12 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   FileText, 
-  DollarSign, 
   BarChart3, 
   Settings,
   Home,
   BookOpen,
   TrendingUp,
+  DollarSign,
   CreditCard,
   X,
   ChevronLeft,
@@ -24,8 +24,8 @@ const getMenuItems = (isMaster: boolean) => {
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/empresas', label: 'Empresas', icon: Building2 },
     { path: '/contas', label: 'Plano de Contas', icon: BookOpen },
-    { path: '/lancamentos', label: 'Lançamentos', icon: DollarSign },
     { path: '/contas-pagar', label: 'Contas a Pagar', icon: CreditCard },
+    { path: '/entradas', label: 'Entradas', icon: DollarSign },
     { path: '/dre', label: 'DRE', icon: FileText },
     { path: '/relatorios', label: 'Relatórios', icon: BarChart3 }
   ];

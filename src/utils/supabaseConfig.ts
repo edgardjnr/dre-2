@@ -9,12 +9,14 @@
 export const isSupabaseConfigured = (): boolean => {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  return Boolean(
-    url && 
-    key && 
-    url !== 'your-project-url.supabase.co' && 
-    key !== 'your-anon-key-here' &&
-    url.includes('.supabase.co')
-  );
+
+  if (!url || !key) return false;
+  if (url === 'your-project-url.supabase.co' || key === 'your-anon-key-here') return false;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.supabase.co');
+  } catch {
+    return false;
+  }
 };

@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { ContaPagar, ContaPagarFormData, ContaPagarStatus, ContaContabil } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2, FileText, DollarSign, Calendar, Tag, Camera, Upload, X, Check, Barcode } from 'lucide-react';
+import { Building2, FileText, DollarSign, Calendar, Tag, Camera, Upload, X, Check, Barcode, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Spinner } from '../ui/Spinner';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -19,6 +19,7 @@ interface ContaPagarFormProps {
 export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const comprovanteInputRef = useRef<HTMLInputElement>(null);
   
   // Função para garantir que a data seja salva sem conversão de timezone
   const formatDateForDatabase = (dateString: string): string => {
@@ -144,6 +145,11 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const [signedPhotoUrls, setSignedPhotoUrls] = useState<Record<string, string>>({});
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
+  const [existingComprovante, setExistingComprovante] = useState<{ url: string; name: string } | null>(null);
+  const [signedComprovanteUrl, setSignedComprovanteUrl] = useState<string>('');
+  const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
+  const [comprovantePreview, setComprovantePreview] = useState<string>('');
+  const [comprovanteRemoved, setComprovanteRemoved] = useState(false);
   
   // Estados para sugestões de fornecedores
   const [fornecedoresSugeridos, setFornecedoresSugeridos] = useState<string[]>([]);
@@ -151,6 +157,10 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   
   // Estado para data formatada dd/mm/yyyy
   const [dataVencimentoFormatada, setDataVencimentoFormatada] = useState<string>('');
+  // Estado para status e data de pagamento
+  const [status, setStatus] = useState<ContaPagarStatus>(conta?.status || 'pendente');
+  const [dataPagamentoFormatada, setDataPagamentoFormatada] = useState<string>('');
+  const [dataPagamento, setDataPagamento] = useState<string>('');
   
   // Estado para tipo de documento
   const [tipoDocumento, setTipoDocumento] = useState<'codigo_barras' | 'pix' | 'padrao'>('padrao');
@@ -227,6 +237,14 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       setSelectedCategoriaDre('');
       setValorFormatado(formatarMoeda(conta.valor));
       setDataVencimentoFormatada(convertFromISODate(conta.dataVencimento));
+      setStatus(conta.status);
+      setDataPagamentoFormatada(conta.dataPagamento ? convertFromISODate(conta.dataPagamento) : '');
+      setDataPagamento(conta.dataPagamento || '');
+      setExistingComprovante(conta.fotoUrl ? { url: conta.fotoUrl, name: conta.fotoNome || 'Comprovante de Pagamento' } : null);
+      setSignedComprovanteUrl('');
+      setComprovanteFile(null);
+      setComprovantePreview('');
+      setComprovanteRemoved(false);
       
       // Carregar fotos existentes
       loadExistingPhotos(conta.id);
@@ -238,6 +256,14 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       setPhotoFiles([]);
       setPhotoPreviews([]);
       setDataVencimentoFormatada('');
+      setStatus('pendente');
+      setDataPagamentoFormatada('');
+      setDataPagamento('');
+      setExistingComprovante(null);
+      setSignedComprovanteUrl('');
+      setComprovanteFile(null);
+      setComprovantePreview('');
+      setComprovanteRemoved(false);
     }
   }, [conta]);
 
@@ -267,6 +293,21 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     }
   }, [existingPhotos]);
 
+  useEffect(() => {
+    const generateSignedComprovante = async () => {
+      if (!existingComprovante?.url) return;
+      const key = extractStorageKey(existingComprovante.url);
+      if (!key) return;
+      const { data, error } = await supabase.storage
+        .from('contas-fotos')
+        .createSignedUrl(key, 60 * 60 * 24 * 7);
+      if (!error && data?.signedUrl) {
+        setSignedComprovanteUrl(data.signedUrl);
+      }
+    };
+    generateSignedComprovante();
+  }, [existingComprovante]);
+
   const contaParaModal = useMemo<ContaPagar>(() => {
     const fotos: ContaPagar['fotos'] = [
       ...existingPhotos.map((p, idx) => ({
@@ -293,11 +334,14 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       descricao: formData.descricao || conta?.descricao || '',
       valor: formData.valor || conta?.valor || 0,
       dataVencimento: formData.dataVencimento || conta?.dataVencimento || '',
-      status: conta?.status || 'pendente',
+      status: status || conta?.status || 'pendente',
+      dataPagamento: dataPagamento || conta?.dataPagamento || undefined,
       contaContabilId: formData.contaContabilId || conta?.contaContabilId,
       numeroDocumento: formData.numeroDocumento || conta?.numeroDocumento,
       observacoes: formData.observacoes || conta?.observacoes,
       empresaId: selectedEmpresaId || conta?.empresaId || '',
+      fotoUrl: comprovantePreview || existingComprovante?.url || undefined,
+      fotoNome: comprovanteFile?.name || existingComprovante?.name || undefined,
       fotos,
       createdAt: conta?.createdAt || new Date().toISOString(),
       updatedAt: conta?.updatedAt || new Date().toISOString()
@@ -313,7 +357,12 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     formData.observacoes,
     formData.valor,
     photoPreviews,
-    selectedEmpresaId
+    selectedEmpresaId,
+    status,
+    dataPagamento,
+    comprovantePreview,
+    comprovanteFile,
+    existingComprovante
   ]);
 
   const fetchEmpresas = async () => {
@@ -513,6 +562,46 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     setUploadError(null);
   };
 
+  const handleComprovanteInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const validExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension || !validExtensions.includes(extension) || !file.type.startsWith('image/')) {
+      setUploadError('Apenas arquivos de imagem são permitidos (JPG, JPEG, PNG, WEBP)');
+      if (e.target) {
+        e.target.value = '';
+      }
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('Arquivo muito grande. Máximo 10MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setComprovantePreview(result);
+    };
+    reader.readAsDataURL(file);
+
+    setComprovanteFile(file);
+    setComprovanteRemoved(false);
+    setUploadError(null);
+  };
+
+  const handleRemoveComprovante = async () => {
+    setComprovanteFile(null);
+    setComprovantePreview('');
+    setComprovanteRemoved(true);
+    setExistingComprovante(null);
+    setSignedComprovanteUrl('');
+  };
+
   // Função para carregar fotos existentes
   const loadExistingPhotos = async (contaId: string) => {
     try {
@@ -641,6 +730,30 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     }
   };
 
+  const uploadComprovante = async (): Promise<{ url: string; name: string } | null> => {
+    if (!comprovanteFile) return null;
+
+    setUploadingPhoto(true);
+    try {
+      const fileExt = comprovanteFile.name.split('.').pop();
+      const fileName = `${Date.now()}_comprovante.${fileExt}`;
+      const filePath = `${user?.id || 'anonymous'}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('contas-fotos')
+        .upload(filePath, comprovanteFile);
+
+      if (uploadError) throw uploadError;
+
+      return { url: filePath, name: comprovanteFile.name };
+    } catch (error) {
+      console.error('Erro ao fazer upload do comprovante:', error);
+      throw error;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -660,6 +773,13 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       }
       // Upload das fotos se houver arquivos
       const uploadedPhotos = await uploadPhotos();
+      const uploadedComprovante = await uploadComprovante();
+      const comprovanteAtual = uploadedComprovante
+        ? uploadedComprovante
+        : comprovanteRemoved
+          ? null
+          : existingComprovante;
+      const previousComprovanteKey = conta?.fotoUrl ? extractStorageKey(conta.fotoUrl) : null;
   
       // Dados corrigidos para o banco (usando snake_case para colunas do banco)
       const contaData = {
@@ -673,10 +793,12 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         observacoes: formData.observacoes || null,
         empresa_id: selectedEmpresaId,
         tipo_documento: tipoDocumento === 'pix' ? 'pix' : 'boleto',
-        // Manter compatibilidade com foto única (primeira foto)
-        foto_url: uploadedPhotos.length > 0 ? uploadedPhotos[0].url : null,
-        foto_nome: uploadedPhotos.length > 0 ? uploadedPhotos[0].name : null,
-        status: 'pendente' as ContaPagarStatus
+        foto_url: comprovanteAtual?.url || null,
+        foto_nome: comprovanteAtual?.name || null,
+        status: status as ContaPagarStatus,
+        data_pagamento: status === 'paga'
+          ? formatDateForDatabase(dataPagamento || new Date().toISOString().split('T')[0])
+          : null
       };
 
       let contaId: string;
@@ -689,6 +811,13 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
 
         if (error) throw error;
         contaId = conta.id;
+
+        if (previousComprovanteKey && (uploadedComprovante || comprovanteRemoved)) {
+          const { error: removeComprovanteError } = await supabase.storage
+            .from('contas-fotos')
+            .remove([previousComprovanteKey]);
+          if (removeComprovanteError) throw removeComprovanteError;
+        }
 
         if (photosToRemove.length > 0) {
           const { data: fotosParaRemover, error: buscarFotosError } = await supabase
@@ -743,6 +872,43 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         if (fotosError) throw fotosError;
       }
 
+      try {
+        const { data: contaDataAtualizada, error: contaFetchError } = await supabase
+          .from('contas_a_pagar')
+          .select('*')
+          .eq('id', contaId)
+          .single();
+
+        if (contaFetchError) throw contaFetchError;
+
+        if (contaDataAtualizada) {
+          const contaAtualizada: ContaPagar = {
+            id: contaDataAtualizada.id,
+            empresaId: contaDataAtualizada.empresa_id,
+            fornecedor: contaDataAtualizada.fornecedor,
+            descricao: contaDataAtualizada.descricao,
+            valor: contaDataAtualizada.valor,
+            dataVencimento: contaDataAtualizada.data_vencimento,
+            dataPagamento: contaDataAtualizada.data_pagamento || undefined,
+            status: contaDataAtualizada.status,
+            observacoes: contaDataAtualizada.observacoes || undefined,
+            numeroDocumento: contaDataAtualizada.numero_documento || undefined,
+            fotoUrl: contaDataAtualizada.foto_url || undefined,
+            fotoNome: contaDataAtualizada.foto_nome || undefined,
+            fotos: [],
+            contaContabilId: contaDataAtualizada.conta_contabil_id || undefined,
+            lancamentoGeradoId: contaDataAtualizada.lancamento_gerado_id || undefined,
+            createdAt: contaDataAtualizada.created_at,
+            updatedAt: contaDataAtualizada.updated_at
+          };
+          const { useDRELancamento } = await import('./hooks/useDRELancamento');
+          const { sincronizarLancamentoDRE } = useDRELancamento(onSave);
+          await sincronizarLancamentoDRE(contaAtualizada);
+        }
+      } catch (e) {
+        console.error('Erro ao gerar lançamento DRE automático:', e);
+      }
+
       onSave();
     } catch (error: any) {
       console.error('Erro ao salvar conta:', error);
@@ -775,7 +941,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 setSelectedCategoriaDre('');
                 setFormData(prev => ({ ...prev, contaContabilId: '' })); // Limpar conta contábil ao trocar empresa
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
               required
             >
               <option value="">Selecione uma empresa</option>
@@ -786,6 +952,39 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
               ))}
             </select>
           </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <CheckCircle className="inline w-4 h-4 mr-1" />
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as ContaPagarStatus)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base"
+            >
+              <option value="pendente">Pendente</option>
+              <option value="paga">Paga</option>
+              <option value="vencida">Vencida</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          {status === 'paga' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Calendar className="inline w-4 h-4 mr-1" />
+                Data de Pagamento
+              </label>
+              <DatePicker
+                value={dataPagamentoFormatada}
+                onChange={(value) => setDataPagamentoFormatada(value)}
+                onISOChange={(isoValue) => setDataPagamento(isoValue)}
+                placeholder="dd/mm/yyyy"
+                className="text-sm sm:text-base"
+              />
+            </div>
+          )}
 
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -812,7 +1011,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 // Pequeno delay para permitir que o clique na sugestão seja processado
                 setTimeout(() => setMostrarSugestoes(false), 200);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base truncate"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base truncate"
               placeholder="Nome do fornecedor"
               required
             />
@@ -834,6 +1033,8 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           </div>
 
 
+          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <DollarSign className="inline w-4 h-4 mr-1" />
@@ -851,7 +1052,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 const valorNumerico = desformatarMoeda(valorFormatadoNovo);
                 setFormData(prev => ({ ...prev, valor: valorNumerico }));
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base"
               placeholder="0,00"
               required
             />
@@ -872,7 +1073,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                   const novoTipo = detectarTipoDocumento(novoValor);
                   setTipoDocumento(novoTipo);
                 }}
-                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base truncate"
+                className="flex-1 min-w-0 px-4 py-3 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base truncate"
                 placeholder="Digite ou escaneie o código"
               />
               <button
@@ -921,7 +1122,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 setSelectedCategoriaDre(e.target.value);
                 setFormData(prev => ({ ...prev, contaContabilId: '' }));
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
               disabled={!selectedEmpresaId || categoriasDisponiveis.length === 0}
             >
               <option value="">
@@ -948,7 +1149,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
               <select
                 value={formData.contaContabilId || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, contaContabilId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base text-ellipsis"
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
                 disabled={!selectedEmpresaId || !selectedCategoriaDre || contasContabeisPorCategoria.length === 0}
               >
                 <option value="">Selecione uma conta contábil</option>
@@ -968,7 +1169,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
               type="text"
               value={formData.descricao || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base"
               placeholder="Descrição da conta"
             />
           </div>
@@ -981,10 +1182,75 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           <textarea
             value={formData.observacoes || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base"
             rows={3}
             placeholder="Observações adicionais"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Camera className="inline w-4 h-4 mr-1" />
+            Comprovante de Pagamento
+          </label>
+
+          <input
+            ref={comprovanteInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleComprovanteInputChange}
+            className="hidden"
+          />
+
+          {(existingComprovante || comprovantePreview) ? (
+            <div className="space-y-3">
+              <div className="relative group w-full sm:w-64">
+                <img
+                  src={comprovantePreview || signedComprovanteUrl || existingComprovante?.url || ''}
+                  alt={comprovanteFile?.name || existingComprovante?.name || 'Comprovante'}
+                  className="w-full h-40 object-cover rounded-lg border cursor-pointer"
+                  loading="lazy"
+                  onClick={() => {
+                    const url = comprovantePreview || signedComprovanteUrl || existingComprovante?.url;
+                    if (!url) return;
+                    setSelectedImage({ url, name: comprovanteFile?.name || existingComprovante?.name || 'Comprovante de Pagamento' });
+                    setShowImageModal(true);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveComprovante}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => comprovanteInputRef.current?.click()}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  Trocar comprovante
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed rounded-lg p-4 text-center">
+              <Upload className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+              <p className="text-gray-600 mb-2">Arraste o comprovante aqui ou</p>
+              <button
+                type="button"
+                onClick={() => comprovanteInputRef.current?.click()}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                clique para selecionar
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                Máximo 10MB (JPG, JPEG, PNG, WEBP)
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Seção de Upload de Fotos */}

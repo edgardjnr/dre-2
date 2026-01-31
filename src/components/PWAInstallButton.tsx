@@ -58,17 +58,17 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '' }) =
     const buttonVariants = {
         idle: {
             backgroundColor: "rgb(59, 130, 246)",
-            color: "#ffffff",
+            color: "rgb(255, 255, 255)",
             scale: 1,
         },
         installing: {
             backgroundColor: "rgb(168, 85, 247)",
-            color: "#ffffff",
+            color: "rgb(255, 255, 255)",
             scale: 1,
         },
         installed: {
             backgroundColor: "rgb(34, 197, 94)",
-            color: "#ffffff",
+            color: "rgb(255, 255, 255)",
             scale: [1, 1.1, 1],
             transition: {
                 duration: 0.2,

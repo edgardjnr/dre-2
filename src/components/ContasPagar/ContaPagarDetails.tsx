@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ContaPagar, ContaContabil } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
-import { StatusControl } from './components/StatusControl';
 import { ContaPagarInfo } from './components/ContaPagarInfo';
 import { ImageModal } from './components/ImageModal';
-import { ConfirmationModal } from './components/ConfirmationModal';
-import { useEditConta } from './hooks/useEditConta';
-import { useDRELancamento } from './hooks/useDRELancamento';
+import { ContaPagarForm } from './ContaPagarForm';
+import { Pencil, Eye } from 'lucide-react';
 
 interface ContaPagarDetailsProps {
   conta: ContaPagar;
@@ -18,16 +16,9 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'edit'>('overview');
   
-  const editControl = useEditConta(
-    conta.id,
-    conta.status,
-    conta.valor,
-    conta.dataVencimento,
-    conta.dataPagamento || null,
-    onUpdate
-  );
-  const dreService = useDRELancamento(onUpdate);
+  
 
   // Buscar contas contábeis
   useEffect(() => {
@@ -64,43 +55,53 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
-      {/* Header com controle de status */}
-      <div className={`${editControl.editing ? 'w-full' : 'flex justify-end'}`}>
-        <div className={`${editControl.editing ? 'w-full' : 'flex items-center space-x-3'}`}>
-          <StatusControl
-            currentStatus={conta.status}
-            currentValor={conta.valor}
-            currentDataVencimento={conta.dataVencimento}
-            editing={editControl.editing}
-            newStatus={editControl.newStatus}
-            newValor={editControl.newValor}
-            newDataVencimento={editControl.newDataVencimento}
-            loading={editControl.loading}
-            onStartEdit={() => editControl.setEditing(true)}
-            onStatusChange={editControl.setNewStatus}
-            onValorChange={editControl.setNewValor}
-            onDataVencimentoChange={editControl.setNewDataVencimento}
-            onSave={editControl.handleSave}
-            onCancel={editControl.handleCancel}
-            // Novas props para data de pagamento
-            newDataPagamento={editControl.newDataPagamento}
-            onDataPagamentoChange={editControl.setNewDataPagamento}
-          />
+      {/* Abas */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-3 py-2 text-sm rounded-t-md ${activeTab === 'overview' ? 'bg-white border-x border-t border-gray-200 text-gray-900' : 'text-gray-600 hover:text-gray-900'}`}
+            title="Detalhes"
+          >
+            <Eye className="w-4 h-4 inline mr-1" /> Detalhes
+          </button>
+          <button
+            onClick={() => setActiveTab('edit')}
+            className={`px-3 py-2 text-sm rounded-t-md ${activeTab === 'edit' ? 'bg-white border-x border-t border-gray-200 text-gray-900' : 'text-gray-600 hover:text-gray-900'}`}
+            title="Editar"
+          >
+            <Pencil className="w-4 h-4 inline mr-1" /> Editar
+          </button>
         </div>
       </div>
 
-      {/* Informações principais */}
-      <div className={editControl.editing ? 'mt-6' : ''}>
-        <ContaPagarInfo
-        conta={conta}
-        empresa={empresa}
-        contasContabeis={contasContabeis}
-        onImageClick={(imageUrl: string, imageName: string) => {
-          setSelectedImage({ url: imageUrl, name: imageName });
-          setShowImageModal(true);
-        }}
-      />
-      </div>
+      {/* Conteúdo por aba */}
+      {activeTab === 'overview' && (
+        <div>
+          <ContaPagarInfo
+            conta={conta}
+            empresa={empresa}
+            contasContabeis={contasContabeis}
+            onImageClick={(imageUrl: string, imageName: string) => {
+              setSelectedImage({ url: imageUrl, name: imageName });
+              setShowImageModal(true);
+            }}
+          />
+        </div>
+      )}
+
+      {activeTab === 'edit' && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
+          <ContaPagarForm
+            conta={conta}
+            onSave={() => {
+              setActiveTab('overview');
+              onUpdate?.();
+            }}
+            onCancel={() => setActiveTab('overview')}
+          />
+        </div>
+      )}
 
       {/* Modal de visualização da imagem */}
       {showImageModal && selectedImage && (
@@ -116,15 +117,6 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
         />
       )}
 
-      {/* Modal de confirmação */}
-      <ConfirmationModal
-        isOpen={editControl.showConfirmModal}
-        title="Confirmar Alterações"
-        message="Ao marcar esta conta como paga, será gerado automaticamente um lançamento no DRE com o valor informado. Deseja continuar?"
-        loading={editControl.loading}
-        onConfirm={editControl.confirmSave}
-        onCancel={editControl.cancelSave}
-      />
     </div>
   );
 }

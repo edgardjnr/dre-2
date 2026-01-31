@@ -137,7 +137,10 @@ export const ConfiguracoesPage: React.FC = () => {
     
     try {
       setLoadingAction(`removing-${collaboratorId}`);
-      await CollaboratorsService.removeCollaborator(collaboratorId);
+      const result = await CollaboratorsService.removeCollaborator(collaboratorId);
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao remover colaborador');
+      }
       fetchCollaborators();
       alert('Colaborador removido com sucesso!');
     } catch (error: any) {

@@ -92,9 +92,68 @@ export function useDRELancamento(onUpdate?: () => void) {
     }
   };
 
+  const sincronizarLancamentoDRE = async (conta: ContaPagar) => {
+    if (!conta.contaContabilId) return;
+
+    if (conta.status === 'paga') {
+      if (!conta.lancamentoGeradoId) {
+        await gerarLancamentoDREAutomatico(conta);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const { error } = await supabase
+          .from('lancamentos')
+          .update({
+            empresa_id: conta.empresaId,
+            conta_id: conta.contaContabilId,
+            descricao: `Conta a pagar: ${conta.descricao}`,
+            valor: conta.valor,
+            data: conta.dataPagamento || conta.dataVencimento,
+            tipo: 'Débito'
+          })
+          .eq('id', conta.lancamentoGeradoId);
+
+        if (error) throw error;
+        onUpdate?.();
+      } catch (error: any) {
+        console.error('Erro ao atualizar lançamento DRE:', error);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!conta.lancamentoGeradoId) return;
+
+    try {
+      setLoading(true);
+      const { error: deleteError } = await supabase
+        .from('lancamentos')
+        .delete()
+        .eq('id', conta.lancamentoGeradoId);
+
+      if (deleteError) throw deleteError;
+
+      const { error: updateError } = await supabase
+        .from('contas_a_pagar')
+        .update({ lancamento_gerado_id: null })
+        .eq('id', conta.id);
+
+      if (updateError) throw updateError;
+      onUpdate?.();
+    } catch (error: any) {
+      console.error('Erro ao remover lançamento DRE:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     gerarLancamentoDRE,
-    gerarLancamentoDREAutomatico
+    gerarLancamentoDREAutomatico,
+    sincronizarLancamentoDRE
   };
 }

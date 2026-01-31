@@ -100,6 +100,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     console.log('🚀 [DEBUG] AuthContext useEffect iniciado');
+
+    const forceLogout = async (message: string) => {
+      setUserProfile(null);
+      setSession(null);
+      setUser(null);
+      setError(new Error(message));
+
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        const projectId = import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0];
+        if (projectId) {
+          localStorage.removeItem(`sb-${projectId}-auth-token`);
+        }
+      } catch (storageError) {
+        console.warn('Erro ao limpar localStorage:', storageError);
+      }
+
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (supabaseError) {
+        console.warn('Erro no logout do Supabase (ignorado):', supabaseError);
+      }
+    };
+
+    const validateAccess = async (currentSession: Session | null) => {
+      if (!currentSession?.user?.id) return;
+      const { data, error } = await supabase.rpc('get_user_companies');
+      if (error) return;
+      if (!data || data.length === 0) {
+        await forceLogout('Seu acesso foi removido.');
+      }
+    };
     
     const getSession = async () => {
       try {
@@ -127,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = createUserProfile(session.user);
           setUserProfile(profile);
           console.log('✅ [DEBUG] userProfile definido no estado:', profile);
+          await validateAccess(session);
         } else {
           console.log('🚫 [DEBUG] Sem sessão, limpando perfil');
           setUserProfile(null);
@@ -175,6 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = createUserProfile(session.user);
           setUserProfile(profile);
           console.log('✅ [DEBUG] userProfile definido no estado:', profile);
+          await validateAccess(session);
         } else if (!session) {
           console.log('🚫 [DEBUG] Sem sessão, limpando perfil');
           setUserProfile(null);
@@ -196,7 +230,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      
+      try {
+        const { error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr && /Failed to fetch|NAME_NOT_RESOLVED|NetworkError/i.test(sessionErr.message)) {
+          setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+          return false;
+        }
+      } catch (prefErr: unknown) {
+        const msg = prefErr instanceof Error ? prefErr.message : String(prefErr ?? '');
+        if (/Failed to fetch|NAME_NOT_RESOLVED|NetworkError/i.test(msg)) {
+          setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+          return false;
+        }
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
         password: credentials.password,
@@ -207,9 +254,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // Tratamento específico para erros comuns
         if ((error as any).status === 503 || error.message?.includes('503')) {
-          setError(new Error('Serviço indisponível (503). O projeto Supabase pode estar pausado ou em manutenção. Verifique o painel do Supabase.'));
+          setError({ name: 'AuthError', message: 'Serviço de autenticação indisponível (503). Verifique o status do projeto Supabase.' } as AuthError);
         } else if ((error as any).status === 400 && error.message?.includes('Invalid login credentials')) {
-          setError(new Error('Email ou senha incorretos.'));
+          setError({ name: 'AuthError', message: 'Email ou senha incorretos.' } as AuthError);
         } else {
           setError(error);
         }
@@ -219,6 +266,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return true;
     } catch (error) {
       console.error('Erro no login:', error);
+      const message = error instanceof Error ? error.message : 'Erro ao conectar com o servidor de autenticação.';
+      if (/NAME_NOT_RESOLVED/i.test(message) || /Failed to fetch/i.test(message) || /NetworkError/i.test(message)) {
+        setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+      } else if (/503/i.test(message) || /Service Unavailable/i.test(message)) {
+        setError({ name: 'AuthError', message: 'Serviço de autenticação indisponível (503).' } as AuthError);
+      } else {
+        setError({ name: 'AuthError', message } as AuthError);
+      }
       return false;
     } finally {
       setLoading(false);

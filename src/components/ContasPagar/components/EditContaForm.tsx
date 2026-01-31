@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, CheckCircle } from 'lucide-react';
+import { Calendar, CheckCircle } from 'lucide-react';
 import { ContaPagarStatus } from '../../../types';
 import { format } from 'date-fns';
 import { applyDateMask, isValidDate, convertToISODate, convertFromISODate } from '../../../utils/dateUtils';
@@ -28,16 +28,11 @@ const formatDateForDatabase = (dateString: string): string => {
 
 interface EditContaFormProps {
   currentStatus: ContaPagarStatus;
-  currentValor: number;
   currentDataVencimento: string;
   newStatus: ContaPagarStatus;
-  newValor: string;
-  newDataVencimento: string;
   newDataPagamento?: string;
   loading: boolean;
   onStatusChange: (status: ContaPagarStatus) => void;
-  onValorChange: (valor: string) => void;
-  onDataVencimentoChange: (data: string) => void;
   onDataPagamentoChange?: (data: string) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -69,34 +64,18 @@ const parseCurrencyToNumber = (value: string): number => {
 
 export function EditContaForm({
   currentStatus,
-  currentValor,
   currentDataVencimento,
   newStatus,
-  newValor,
-  newDataVencimento,
   newDataPagamento = '',
   loading,
   onStatusChange,
-  onValorChange,
-  onDataVencimentoChange,
   onDataPagamentoChange,
   onSave,
   onCancel
 }: EditContaFormProps) {
-  // Estado para data formatada dd/mm/yyyy (vencimento)
-  const [dataVencimentoFormatada, setDataVencimentoFormatada] = useState<string>('');
   // Estado para data formatada dd/mm/yyyy (pagamento)
   const [dataPagamentoFormatada, setDataPagamentoFormatada] = useState<string>('');
   
-  // Inicializar a data formatada quando o componente monta ou newDataVencimento muda
-  useEffect(() => {
-    if (newDataVencimento) {
-      setDataVencimentoFormatada(convertFromISODate(newDataVencimento));
-    } else {
-      setDataVencimentoFormatada('');
-    }
-  }, [newDataVencimento]);
-
   // Inicializar a data de pagamento formatada quando prop mudar
   useEffect(() => {
     if (newDataPagamento) {
@@ -105,12 +84,6 @@ export function EditContaForm({
       setDataPagamentoFormatada('');
     }
   }, [newDataPagamento]);
-
-  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const formattedValue = formatCurrency(rawValue);
-    onValorChange(formattedValue);
-  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -164,40 +137,6 @@ export function EditContaForm({
               <option value="vencida">Vencida</option>
               <option value="cancelada">Cancelada</option>
             </select>
-          </div>
-
-          {/* Valor */}
-          <div className="space-y-2">
-            <label className="flex items-center text-sm font-medium text-gray-700">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Valor
-            </label>
-            <input
-              type="text"
-              value={newValor}
-              onChange={handleValorChange}
-              placeholder="R$ 0,00"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          {/* Data de Vencimento */}
-          <div className="space-y-2">
-            <label className="flex items-center text-sm font-medium text-gray-700">
-              <Calendar className="w-4 h-4 mr-2" />
-              Data de Vencimento
-            </label>
-            <DatePicker
-              value={dataVencimentoFormatada}
-              onChange={(value) => {
-                setDataVencimentoFormatada(value);
-              }}
-              onISOChange={(isoValue) => {
-                onDataVencimentoChange(isoValue);
-              }}
-              placeholder="dd/mm/yyyy"
-              className="text-sm"
-            />
           </div>
         </div>
 

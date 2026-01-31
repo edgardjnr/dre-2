@@ -194,7 +194,7 @@ export function DatePicker({
           onFocus={handleInputFocus}
           placeholder={placeholder}
           disabled={disabled}
-          className={`w-full px-3 py-2 pr-10 border rounded-md text-sm focus:outline-none focus:ring-2 focus:border-blue-500 transition-colors ${
+          className={`w-full px-4 py-3 pr-10 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white focus:border-blue-500 transition-colors ${
             error || isInputError
               ? 'border-red-300 focus:ring-red-500'
               : 'border-gray-300 focus:ring-blue-500'
@@ -204,7 +204,7 @@ export function DatePicker({
           type="button"
           onClick={handleCalendarIconClick}
           disabled={disabled}
-          className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+          className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-white transition-colors ${
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
           }`}
         >

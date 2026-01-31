@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Filter, Edit2, Trash2, CreditCard, Eye, FileText, Calendar, AlertTriangle, Menu, X, ChevronUp, ChevronDown, ChevronsUpDown, ArrowUpDown } from 'lucide-react';
+import { Plus, Filter, Trash2, CreditCard, Eye, FileText, Calendar, AlertTriangle, Menu, X, ChevronUp, ChevronDown, ChevronsUpDown, ArrowUpDown } from 'lucide-react';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 // Corrigir esta linha - remover duplicação
 // Remover TipoDocumento do import
@@ -46,7 +46,6 @@ export const ContasPagarList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [editingConta, setEditingConta] = useState<ContaPagar | null>(null);
   const [viewingConta, setViewingConta] = useState<ContaPagar | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -250,10 +249,7 @@ export const ContasPagarList: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleEdit = (conta: ContaPagar) => {
-    setEditingConta(conta);
-    setShowModal(true);
-  };
+  // Edição por modal removida
 
   const handleView = (conta: ContaPagar) => {
     setViewingConta(conta);
@@ -678,7 +674,6 @@ export const ContasPagarList: React.FC = () => {
   };
 
   const handleAddNew = () => {
-    setEditingConta(null);
     setShowModal(true);
     
     // Configurar a função global para o scanner
@@ -1278,7 +1273,7 @@ export const ContasPagarList: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center justify-center space-x-1 flex-wrap">
+                    <div className="flex items-center justify-center gap-1 flex-nowrap">
                       <button 
                         onClick={() => handleView(conta)} 
                         className="p-1.5 text-gray-600 hover:text-blue-600 flex-shrink-0"
@@ -1286,13 +1281,7 @@ export const ContasPagarList: React.FC = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button 
-                        onClick={() => handleEdit(conta)} 
-                        className="p-1.5 text-gray-600 hover:text-blue-600 flex-shrink-0"
-                        title="Editar"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
+                      
                       {conta.status === 'pendente' && (
                         <button 
                           onClick={() => handleMarkAsPaid(conta)}
@@ -1485,32 +1474,25 @@ export const ContasPagarList: React.FC = () => {
                 {/* Divisor elegante - Compacto */}
                 <div className="mx-2 border-t border-gray-200"></div>
                 
-                {/* Botões de ação modernos - Grid 2x2 */}
+                {/* Botões de ação modernos */}
                 <div className="p-3 pt-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleView(conta)} 
-                      className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
                       title="Ver detalhes"
                     >
                       <Eye className="h-3 w-3" />
                       <span className="text-xs">Ver</span>
                     </button>
                     
-                    <button 
-                      onClick={() => handleEdit(conta)} 
-                      className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded shadow-md hover:shadow-lg hover:from-gray-600 hover:to-gray-700 transition-all duration-200 transform hover:scale-105"
-                      title="Editar"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                      <span className="text-xs">Editar</span>
-                    </button>
+                    
                     
                     {conta.status === 'pendente' && (
                       <button 
                         onClick={() => handleMarkAsPaid(conta)}
                         disabled={payingContaId === conta.id}
-                        className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-green-500 to-green-600 text-white rounded shadow-md hover:shadow-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-green-500 to-green-600 text-white rounded shadow-md hover:shadow-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
                         title="Marcar como paga"
                       >
                         <CreditCard className="h-3 w-3" />
@@ -1520,7 +1502,7 @@ export const ContasPagarList: React.FC = () => {
                     
                     <button 
                       onClick={() => handleDelete(conta.id)} 
-                      className="flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-red-500 to-red-600 text-white rounded shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 transform hover:scale-105"
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium bg-gradient-to-r from-red-500 to-red-600 text-white rounded shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 transform hover:scale-105"
                       title="Excluir"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -1585,21 +1567,17 @@ export const ContasPagarList: React.FC = () => {
         isOpen={showModal} 
         onClose={() => {
           setShowModal(false);
-          setEditingConta(null);
         }}
-        title={editingConta ? 'Editar Conta' : 'Nova Conta'}
+        title={'Nova Conta'}
         size="lg"
       >
         <ContaPagarForm 
-          conta={editingConta || undefined}
           onSave={() => {
             setShowModal(false);
-            setEditingConta(null);
             fetchData();
           }}
           onCancel={() => {
             setShowModal(false);
-            setEditingConta(null);
           }}
         />
       </Modal>
