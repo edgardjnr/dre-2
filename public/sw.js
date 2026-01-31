@@ -1,10 +1,16 @@
-const CACHE_NAME = 'dre-pwa-v3';
+const CACHE_NAME = 'dre-pwa-v4';
+const scopeUrl = new URL(self.registration.scope);
+const basePath = scopeUrl.pathname.endsWith('/') ? scopeUrl.pathname.slice(0, -1) : scopeUrl.pathname;
+const withBase = (path) => {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${basePath}${normalized}`;
+};
 const CORE_CACHE = [
-  '/',
-  '/manifest.json',
-  '/favicon.svg',
-  '/icon-192.png',
-  '/icon-512.png'
+  withBase('/'),
+  withBase('/manifest.json'),
+  withBase('/favicon.svg'),
+  withBase('/icon-192.png'),
+  withBase('/icon-512.png')
 ];
 
 // Install event - cache resources
@@ -36,8 +42,8 @@ self.addEventListener('fetch', (event) => {
   // Navegação: network-only para evitar index.html desatualizado após deploy
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cached = await caches.match('/');
+      fetch(new Request(event.request, { cache: 'reload' })).catch(async () => {
+        const cached = await caches.match(withBase('/'));
         return cached || new Response('Offline', { status: 503 });
       })
     );
@@ -95,8 +101,8 @@ function doBackgroundSync() {
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Nova notificação do DRE',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: withBase('/icon-192.png'),
+    badge: withBase('/icon-192.png'),
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
@@ -106,12 +112,12 @@ self.addEventListener('push', (event) => {
       {
         action: 'explore',
         title: 'Abrir DRE',
-        icon: '/icon-192.png'
+        icon: withBase('/icon-192.png')
       },
       {
         action: 'close',
         title: 'Fechar',
-        icon: '/icon-192.png'
+        icon: withBase('/icon-192.png')
       }
     ]
   };
@@ -127,7 +133,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'explore') {
     event.waitUntil(
-      clients.openWindow('https://dre.onebots.com.br')
+      clients.openWindow(scopeUrl.origin + withBase('/'))
     );
   }
 });
