@@ -196,6 +196,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
+
+      try {
+        const { error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr && /Failed to fetch|NAME_NOT_RESOLVED|NetworkError/i.test(sessionErr.message)) {
+          setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+          return false;
+        }
+      } catch (prefErr: any) {
+        const msg = prefErr?.message || '';
+        if (/Failed to fetch|NAME_NOT_RESOLVED|NetworkError/i.test(msg)) {
+          setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+          return false;
+        }
+      }
       
       const { error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
@@ -203,13 +217,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (error) {
-        setError(error);
+        if ((error as any).status === 503 || error.message?.includes('503')) {
+          setError({ name: 'AuthError', message: 'Serviço de autenticação indisponível (503). Verifique o status do projeto Supabase.' } as AuthError);
+        } else if (error.message?.includes('Invalid login credentials')) {
+          setError({ name: 'AuthError', message: 'Email ou senha incorretos.' } as AuthError);
+        } else {
+          setError(error);
+        }
         return false;
       }
 
       return true;
     } catch (error) {
       console.error('Erro no login:', error);
+      const message = error instanceof Error ? error.message : 'Erro ao conectar com o servidor de autenticação.';
+      if (/NAME_NOT_RESOLVED/i.test(message) || /Failed to fetch/i.test(message) || /NetworkError/i.test(message)) {
+        setError({ name: 'AuthError', message: 'Falha de conexão com o Supabase (DNS/Network). Verifique sua internet e a URL do projeto.' } as AuthError);
+      } else if (/503/i.test(message) || /Service Unavailable/i.test(message)) {
+        setError({ name: 'AuthError', message: 'Serviço de autenticação indisponível (503).' } as AuthError);
+      } else {
+        setError({ name: 'AuthError', message } as AuthError);
+      }
       return false;
     } finally {
       setLoading(false);
