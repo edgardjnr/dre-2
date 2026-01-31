@@ -48,6 +48,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
   const [minLoadingTime, setMinLoadingTime] = useState(true);
+
+  const getSupabaseProjectId = (): string | null => {
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      if (!url) return null;
+      const parsed = new URL(url);
+      return parsed.hostname.split('.')[0] || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const clearAuthStorage = () => {
+    try {
+      localStorage.removeItem('supabase.auth.token');
+      const projectId = getSupabaseProjectId();
+      if (projectId) {
+        localStorage.removeItem(`sb-${projectId}-auth-token`);
+        localStorage.removeItem(`dre-auth-token-${projectId}`);
+      }
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (key.startsWith('sb-') || key.startsWith('dre-auth-token-')) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const key of keysToRemove) {
+        localStorage.removeItem(key);
+      }
+    } catch (storageError) {
+      console.warn('Erro ao limpar localStorage:', storageError);
+    }
+  };
+
+  const hasProjectAuthStorage = (): boolean => {
+    try {
+      const projectId = getSupabaseProjectId();
+      if (!projectId) return false;
+      return (
+        localStorage.getItem(`dre-auth-token-${projectId}`) !== null ||
+        localStorage.getItem(`sb-${projectId}-auth-token`) !== null
+      );
+    } catch {
+      return false;
+    }
+  };
   
   // Função para criar perfil do usuário a partir dos dados da sessão
   const createUserProfile = (user: User): UserProfile => {
@@ -74,11 +122,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearInvalidTokens = async () => {
     try {
       await supabase.auth.signOut();
-      // Limpar localStorage manualmente se necessário
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
+      clearAuthStorage();
     } catch (error) {
       console.error('Erro ao limpar tokens:', error);
+      clearAuthStorage();
     }
   };
 
@@ -108,11 +155,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(new Error(message));
 
       try {
-        localStorage.removeItem('supabase.auth.token');
-        const projectId = import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0];
-        if (projectId) {
-          localStorage.removeItem(`sb-${projectId}-auth-token`);
-        }
+        clearAuthStorage();
       } catch (storageError) {
         console.warn('Erro ao limpar localStorage:', storageError);
       }
@@ -126,7 +169,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const validateAccess = async (currentSession: Session | null) => {
       if (!currentSession?.user?.id) return;
-      const { data, error } = await supabase.rpc('get_user_companies');
+      const timeoutMs = 8000;
+      const rpcResult = await Promise.race([
+        supabase.rpc('get_user_companies') as any,
+        new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), timeoutMs),
+        ),
+      ]);
+      const { data, error } = rpcResult as any;
       if (error) return;
       if (!data || data.length === 0) {
         await forceLogout('Seu acesso foi removido.');
@@ -163,6 +213,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } else {
           console.log('🚫 [DEBUG] Sem sessão, limpando perfil');
           setUserProfile(null);
+          if (hasProjectAuthStorage()) {
+            await clearInvalidTokens();
+          }
         }
       } catch (error: any) {
         console.error('💥 [DEBUG] Erro ao obter sessão:', error);
@@ -322,17 +375,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(null);
       setError(null);
       
-      // Tentar limpar localStorage também
-      try {
-        localStorage.removeItem('supabase.auth.token');
-        // Usar variável de ambiente dinâmica em vez de hardcoded
-        const projectId = import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0];
-        if (projectId) {
-          localStorage.removeItem(`sb-${projectId}-auth-token`);
-        }
-      } catch (storageError) {
-        console.warn('Erro ao limpar localStorage:', storageError);
-      }
+      clearAuthStorage();
       
       // Tentar fazer logout no Supabase (opcional, não crítico)
       try {
@@ -349,6 +392,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSession(null);
       setUser(null);
       setError(null);
+      clearAuthStorage();
     } finally {
       setLoading(false);
     }
