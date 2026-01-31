@@ -154,6 +154,8 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   // Estados para sugestões de fornecedores
   const [fornecedoresSugeridos, setFornecedoresSugeridos] = useState<string[]>([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [fornecedorFocused, setFornecedorFocused] = useState(false);
+  const [fornecedorDigitado, setFornecedorDigitado] = useState(false);
   
   // Estado para data formatada dd/mm/yyyy
   const [dataVencimentoFormatada, setDataVencimentoFormatada] = useState<string>('');
@@ -179,13 +181,19 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   
   // Efeito para buscar fornecedores quando o texto digitado mudar
   useEffect(() => {
-    if (debouncedFornecedor && debouncedFornecedor.length >= 2) {
-      buscarFornecedoresSugeridos(debouncedFornecedor);
-    } else {
+    const termo = String(debouncedFornecedor || '').trim();
+    if (!fornecedorFocused || !fornecedorDigitado) {
       setFornecedoresSugeridos([]);
       setMostrarSugestoes(false);
+      return;
     }
-  }, [debouncedFornecedor]);
+    if (termo.length >= 2) {
+      buscarFornecedoresSugeridos(termo);
+      return;
+    }
+    setFornecedoresSugeridos([]);
+    setMostrarSugestoes(false);
+  }, [debouncedFornecedor, fornecedorDigitado, fornecedorFocused]);
 
   // Função para formatar valor como moeda brasileira
   const formatarMoeda = (valor: number): string => {
@@ -233,6 +241,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         observacoes: conta.observacoes || '',
         descricao: conta.descricao || ''
       });
+      setFornecedorDigitado(false);
       setSelectedEmpresaId(conta.empresaId);
       setSelectedCategoriaDre('');
       setValorFormatado(formatarMoeda(conta.valor));
@@ -255,6 +264,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       setPhotosToRemove([]);
       setPhotoFiles([]);
       setPhotoPreviews([]);
+      setFornecedorDigitado(false);
       setDataVencimentoFormatada('');
       setStatus('pendente');
       setDataPagamentoFormatada('');
@@ -417,7 +427,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       // Filtrar fornecedores únicos
       const fornecedoresUnicos = [...new Set(data?.map(item => item.fornecedor))];
       setFornecedoresSugeridos(fornecedoresUnicos);
-      setMostrarSugestoes(fornecedoresUnicos.length > 0);
+      setMostrarSugestoes(fornecedorFocused && fornecedorDigitado && fornecedoresUnicos.length > 0);
     } catch (error) {
       console.error('Erro ao buscar fornecedores:', error);
     }
@@ -484,6 +494,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   // Função para selecionar um fornecedor da lista de sugestões
   const selecionarFornecedor = async (fornecedor: string) => {
     setFormData(prev => ({ ...prev, fornecedor }));
+    setFornecedorDigitado(true);
     setMostrarSugestoes(false);
     
     // Buscar o último lançamento desse fornecedor para preencher os campos automaticamente
@@ -996,20 +1007,18 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
               value={formData.fornecedor}
               onChange={(e) => {
                 setFormData(prev => ({ ...prev, fornecedor: e.target.value }));
-                if (e.target.value.length >= 2) {
-                  setMostrarSugestoes(true);
-                } else {
-                  setMostrarSugestoes(false);
-                }
+                setFornecedorDigitado(true);
               }}
               onFocus={() => {
-                if (formData.fornecedor.length >= 2 && fornecedoresSugeridos.length > 0) {
+                setFornecedorFocused(true);
+                const termo = String(formData.fornecedor || '').trim();
+                if (fornecedorDigitado && termo.length >= 2 && fornecedoresSugeridos.length > 0) {
                   setMostrarSugestoes(true);
                 }
               }}
               onBlur={() => {
-                // Pequeno delay para permitir que o clique na sugestão seja processado
-                setTimeout(() => setMostrarSugestoes(false), 200);
+                setFornecedorFocused(false);
+                setMostrarSugestoes(false);
               }}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base truncate"
               placeholder="Nome do fornecedor"
@@ -1023,7 +1032,10 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                   <div 
                     key={index}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                    onClick={() => selecionarFornecedor(fornecedor)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selecionarFornecedor(fornecedor);
+                    }}
                   >
                     {fornecedor}
                   </div>
