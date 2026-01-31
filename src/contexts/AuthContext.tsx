@@ -47,7 +47,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
-  const [minLoadingTime, setMinLoadingTime] = useState(true);
 
   const getSupabaseProjectId = (): string | null => {
     try {
@@ -129,22 +128,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Controlar tempo mínimo de loading (2.5 segundos)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinLoadingTime(false);
-    }, 2500);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Remover loading quando o tempo mínimo passar
-  useEffect(() => {
-    if (!minLoadingTime) {
-      setLoading(false);
-    }
-  }, [minLoadingTime]);
-
   useEffect(() => {
     console.log('🚀 [DEBUG] AuthContext useEffect iniciado');
 
@@ -209,7 +192,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = createUserProfile(session.user);
           setUserProfile(profile);
           console.log('✅ [DEBUG] userProfile definido no estado:', profile);
-          await validateAccess(session);
+          void validateAccess(session);
         } else {
           console.log('🚫 [DEBUG] Sem sessão, limpando perfil');
           setUserProfile(null);
@@ -230,11 +213,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } finally {
         console.log('✅ [DEBUG] getSession finalizado');
-        // Se o tempo mínimo já passou, remover loading imediatamente
-        if (!minLoadingTime) {
-          setLoading(false);
-        }
-        // Caso contrário, o useEffect do timer vai remover o loading
+        setLoading(false);
       }
     };
 
@@ -261,18 +240,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = createUserProfile(session.user);
           setUserProfile(profile);
           console.log('✅ [DEBUG] userProfile definido no estado:', profile);
-          await validateAccess(session);
+          void validateAccess(session);
         } else if (!session) {
           console.log('🚫 [DEBUG] Sem sessão, limpando perfil');
           setUserProfile(null);
         }
         
         console.log('✅ [DEBUG] onAuthStateChange finalizado');
-        // Se o tempo mínimo já passou, remover loading imediatamente
-        if (!minLoadingTime) {
-          setLoading(false);
-        }
-        // Caso contrário, o useEffect do timer vai remover o loading
+        setLoading(false);
       }
     );
 

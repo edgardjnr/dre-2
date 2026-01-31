@@ -43,9 +43,12 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
       return;
     }
 
-    
+    const loadCompanies = async (): Promise<Company[]> => {
+      const { data, error } = await supabase.rpc('get_user_companies');
+      if (!error && Array.isArray(data)) {
+        return (data as CompanyRow[]).map((row) => ({ id: row.id, razaoSocial: row.razao_social }));
+      }
 
-    const loadCompaniesDirect = async (): Promise<Company[]> => {
       const { data: ownedCompanies, error: ownedError } = await supabase
         .from('empresas')
         .select('id, razao_social')
@@ -87,13 +90,12 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
         mergedMap.set(row.id, { id: row.id, razaoSocial: row.razao_social });
       });
 
-      const merged = Array.from(mergedMap.values());
-      return merged;
+      return Array.from(mergedMap.values());
     };
     
     try {
       console.log('🏢 [DEBUG] Buscando empresas para usuário:', user.id, 'tentativa:', retryCount + 1);
-      const merged = await loadCompaniesDirect();
+      const merged = await loadCompanies();
       setCompanies(merged);
       if (merged.length > 0 && !selectedCompany) {
         setSelectedCompany(merged[0].id);

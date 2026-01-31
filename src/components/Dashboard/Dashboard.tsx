@@ -88,6 +88,8 @@ export const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
+        const minDate = formatDateForAPI(previousPeriodRange.startDate);
+        const maxDate = formatDateForAPI(periodRange.endDate);
         const lancamentosPromise = supabase.from('lancamentos').select(`
           id,
           user_id,
@@ -98,7 +100,7 @@ export const Dashboard: React.FC = () => {
           descricao,
           valor,
           tipo
-        `).eq('empresa_id', empresaId);
+        `).eq('empresa_id', empresaId).gte('data', minDate).lte('data', maxDate);
         
         const contasPromise = supabase.from('contas_contabeis').select(`
           id,

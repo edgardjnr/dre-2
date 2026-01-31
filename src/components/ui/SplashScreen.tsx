@@ -13,38 +13,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
   onComplete 
 }) => {
   const [loadingText, setLoadingText] = useState('Carregando');
-  const [animationProgress, setAnimationProgress] = useState(0);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-  const [shouldHide, setShouldHide] = useState(false);
-
-  // Controlar tempo mínimo de exibição (2 segundos)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Controlar fade-out quando loading terminar
-  useEffect(() => {
-    if (!isVisible && minTimeElapsed) {
-      // Aguardar animação de fade-out antes de esconder completamente
-      const hideTimer = setTimeout(() => {
-        setShouldHide(true);
-      }, 1000); // Tempo da animação de fade-out
-      
-      return () => clearTimeout(hideTimer);
-    }
-  }, [isVisible, minTimeElapsed]);
 
   useEffect(() => {
     if (!isVisible) return;
-
-    // Garantir tempo mínimo de exibição (2 segundos)
-    const minTimeTimer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, 2000);
 
     // Animação do texto de carregamento
     const textInterval = setInterval(() => {
@@ -54,43 +25,16 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
       });
     }, 500);
 
-    // Animação da barra de progresso
-    const progressInterval = setInterval(() => {
-      setAnimationProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          // Só chama onComplete quando o tempo mínimo passou
-          const checkComplete = () => {
-            if (minTimeElapsed) {
-              setTimeout(() => onComplete?.(), 500);
-            } else {
-              setTimeout(checkComplete, 100);
-            }
-          };
-          checkComplete();
-          return 100;
-        }
-        return prev + 1;
-      });
-    }, 30);
-
     return () => {
-      clearTimeout(minTimeTimer);
       clearInterval(textInterval);
-      clearInterval(progressInterval);
     };
-  }, [isVisible, onComplete, minTimeElapsed]);
+  }, [isVisible]);
 
-  // Se deve esconder completamente, não renderizar
-  if (shouldHide) {
-    return null;
-  }
-
-  const currentProgress = progress > 0 ? progress : animationProgress;
+  const currentProgress = progress > 0 ? Math.min(100, Math.max(0, progress)) : 0;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 overflow-hidden transition-opacity duration-1000 ${
-      isVisible ? 'opacity-100' : 'opacity-0'
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 overflow-hidden ${
+      isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
     }`}>
       {/* Efeito de partículas de fundo */}
       <div className="absolute inset-0 opacity-20">
@@ -122,14 +66,20 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
 
         {/* Barra de progresso */}
         <div className="w-full max-w-md space-y-4 animate-fade-in-up animation-delay-500">
-          <div className="relative h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
-            <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-white to-blue-200 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${currentProgress}%` }}
-            >
-              <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
+          {currentProgress > 0 ? (
+            <div className="relative h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+              <div 
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-white to-blue-200 rounded-full transition-all duration-200 ease-out"
+                style={{ width: `${currentProgress}%` }}
+              >
+                <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+              <div className="absolute top-0 left-0 h-full w-1/3 bg-gradient-to-r from-white to-blue-200 rounded-full animate-indeterminate" />
+            </div>
+          )}
           
           {/* Texto de carregamento */}
           <div className="text-center">
@@ -137,7 +87,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
               {loadingText}
             </p>
             <p className="text-white/60 text-sm mt-1">
-              {Math.round(currentProgress)}%
+              {currentProgress > 0 ? `${Math.round(currentProgress)}%` : 'Aguarde...'}
             </p>
           </div>
         </div>
@@ -171,11 +121,17 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
           }
+
+          @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(300%); }
+          }
           
           .animate-bounce-slow { animation: bounce-slow 2s infinite; }
           .animate-spin-slow { animation: spin-slow 3s linear infinite; }
           .animate-fade-in-up { animation: fade-in-up 0.8s ease-out forwards; }
           .animate-shimmer { animation: shimmer 2s infinite; }
+          .animate-indeterminate { animation: indeterminate 1.2s infinite; }
           .animation-delay-500 { animation-delay: 0.5s; }
           .animation-delay-1000 { animation-delay: 1s; }
           .animation-delay-2000 { animation-delay: 2s; }
