@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Session, User, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
+import SplashScreen from '../components/ui/SplashScreen';
 
 // Teste de atualização - verificando se causa loop de carregamento
 
@@ -18,6 +19,11 @@ interface SignInCredentials {
   password: string;
 }
 
+interface SignUpCredentials {
+  email: string;
+  password: string;
+  full_name: string;
+}
 
 
 interface AuthContextType {
@@ -27,6 +33,7 @@ interface AuthContextType {
   loading: boolean;
   error: AuthError | null;
   signInWithEmail: (credentials: SignInCredentials) => Promise<boolean>;
+  signUpWithEmail: (credentials: SignUpCredentials) => Promise<boolean>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
@@ -40,10 +47,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
+  const [minLoadingTime, setMinLoadingTime] = useState(true);
   
-  // Estados do contexto de autenticação
-
-  // Computed values
   // Função para criar perfil do usuário a partir dos dados da sessão
   const createUserProfile = (user: User): UserProfile => {
     console.log('👤 [DEBUG] Criando perfil para usuário:', user.id);
@@ -76,6 +81,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Erro ao limpar tokens:', error);
     }
   };
+
+  // Controlar tempo mínimo de loading (2.5 segundos)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinLoadingTime(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Remover loading quando o tempo mínimo passar
+  useEffect(() => {
+    if (!minLoadingTime) {
+      setLoading(false);
+    }
+  }, [minLoadingTime]);
 
   useEffect(() => {
     console.log('🚀 [DEBUG] AuthContext useEffect iniciado');
@@ -122,8 +143,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUserProfile(null);
         }
       } finally {
-        console.log('✅ [DEBUG] getSession finalizado, loading = false');
-        setLoading(false);
+        console.log('✅ [DEBUG] getSession finalizado');
+        // Se o tempo mínimo já passou, remover loading imediatamente
+        if (!minLoadingTime) {
+          setLoading(false);
+        }
+        // Caso contrário, o useEffect do timer vai remover o loading
       }
     };
 
@@ -155,8 +180,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUserProfile(null);
         }
         
-        console.log('✅ [DEBUG] onAuthStateChange finalizado, loading = false');
-        setLoading(false);
+        console.log('✅ [DEBUG] onAuthStateChange finalizado');
+        // Se o tempo mínimo já passou, remover loading imediatamente
+        if (!minLoadingTime) {
+          setLoading(false);
+        }
+        // Caso contrário, o useEffect do timer vai remover o loading
       }
     );
 
@@ -181,6 +210,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return true;
     } catch (error) {
       console.error('Erro no login:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUpWithEmail = async (credentials: SignUpCredentials): Promise<boolean> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { error } = await supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: {
+          data: {
+            full_name: credentials.full_name
+          }
+        }
+      });
+
+      if (error) {
+        setError(error);
+        return false;
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error('Erro no cadastro:', error);
+      setError(error);
       return false;
     } finally {
       setLoading(false);
@@ -258,12 +317,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading,
     error,
     signInWithEmail,
+    signUpWithEmail,
     signOut,
     resetPassword,
     refreshProfile,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {loading && <SplashScreen isVisible={loading} />}
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {

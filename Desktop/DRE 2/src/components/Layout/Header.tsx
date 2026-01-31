@@ -31,9 +31,9 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
             <Menu className="h-6 w-6" />
           </button>
           
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h1>
-            <p className="text-gray-600 text-xs sm:text-sm mt-1">
+          <div className="min-w-0 overflow-hidden">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{title}</h1>
+            <p className="text-gray-600 text-xs sm:text-sm mt-1 truncate overflow-hidden text-ellipsis">
               {new Date().toLocaleDateString('pt-BR', { 
                 weekday: 'long', 
                 year: 'numeric', 

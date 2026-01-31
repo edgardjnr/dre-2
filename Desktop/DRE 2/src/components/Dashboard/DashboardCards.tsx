@@ -14,7 +14,15 @@ const formatPercent = (value: number) => `${value.toFixed(2)}%`;
 export const DashboardCards: React.FC<DashboardCardsProps> = ({ dreAtual, dreAnterior }) => {
   if (!dreAtual) return null;
 
-  const variacao = dreAnterior ? DREService.compararPeriodos(dreAnterior, dreAtual) : null;
+  // Verificar se há dados válidos do período anterior para comparação
+  // Considera válido se existe dreAnterior e tem pelo menos receita bruta ou algum lançamento
+  const temDadosAnteriores = dreAnterior && (
+    dreAnterior.receitaBruta > 0 || 
+    dreAnterior.receitaLiquida !== 0 || 
+    dreAnterior.lucroLiquido !== 0 ||
+    Object.keys(dreAnterior.categorias || {}).length > 0
+  );
+  const variacao = temDadosAnteriores ? DREService.compararPeriodos(dreAnterior, dreAtual) : null;
 
   const cards = [
     {

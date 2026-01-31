@@ -175,6 +175,7 @@ export interface ContaPagar {
 
 export interface ContaPagarFormData {
   fornecedor: string;
+  descricao: string;
   valor: number;
   dataVencimento: string;
   contaContabilId?: string;

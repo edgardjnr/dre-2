@@ -16,7 +16,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({
   const [isVisible, setIsVisible] = useState(false);
   const [animationClass, setAnimationClass] = useState('');
 
-  console.log('PWAInstallBanner render:', { show, isVisible });
+  // Removido log excessivo
 
   useEffect(() => {
     if (show) {

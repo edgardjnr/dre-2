@@ -22,7 +22,10 @@ module.exports = {
           '100%': { transform: 'translate(100%, 0%)', opacity: '0' },
         },
       },
+      zIndex: {
+        '60': '60',
+      },
     }
   },
-  plugins: [],
+  plugins: []
 };

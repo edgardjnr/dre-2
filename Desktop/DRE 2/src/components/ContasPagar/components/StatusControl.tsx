@@ -1,14 +1,23 @@
 import React from 'react';
 import { CheckCircle, Clock, AlertTriangle, Edit3 } from 'lucide-react';
 import { ContaPagarStatus } from '../../../types';
+import { EditContaForm } from './EditContaForm';
 
 interface StatusControlProps {
   currentStatus: ContaPagarStatus;
-  editingStatus: boolean;
+  currentValor: number;
+  currentDataVencimento: string;
+  editing: boolean;
   newStatus: ContaPagarStatus;
+  newValor: string;
+  newDataVencimento: string;
+  newDataPagamento?: string;
   loading: boolean;
   onStartEdit: () => void;
   onStatusChange: (status: ContaPagarStatus) => void;
+  onValorChange: (valor: string) => void;
+  onDataVencimentoChange: (data: string) => void;
+  onDataPagamentoChange?: (data: string) => void;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -36,42 +45,42 @@ const getStatusLabel = (status: string) => {
 
 export function StatusControl({
   currentStatus,
-  editingStatus,
+  currentValor,
+  currentDataVencimento,
+  editing,
   newStatus,
+  newValor,
+  newDataVencimento,
+  newDataPagamento,
   loading,
   onStartEdit,
   onStatusChange,
+  onValorChange,
+  onDataVencimentoChange,
+  onDataPagamentoChange,
   onSave,
   onCancel
 }: StatusControlProps) {
-  if (editingStatus) {
+  if (editing) {
     return (
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-        <select
-          value={newStatus}
-          onChange={(e) => onStatusChange(e.target.value as ContaPagarStatus)}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
-        >
-          <option value="pendente">Pendente</option>
-          <option value="paga">Paga</option>
-          <option value="vencida">Vencida</option>
-          <option value="cancelada">Cancelada</option>
-        </select>
-        <div className="flex space-x-2">
-          <button
-            onClick={onSave}
-            disabled={loading}
-            className="flex-1 sm:flex-none px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
-          >
-            {loading ? 'Salvando...' : 'Salvar'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 sm:flex-none px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm"
-          >
-            Cancelar
-          </button>
-        </div>
+      <div className="w-full">
+        <EditContaForm
+          currentStatus={currentStatus}
+          currentValor={currentValor}
+          currentDataVencimento={currentDataVencimento}
+          newStatus={newStatus}
+          newValor={newValor}
+          newDataVencimento={newDataVencimento}
+          loading={loading}
+          onStatusChange={onStatusChange}
+          onValorChange={onValorChange}
+          onDataVencimentoChange={onDataVencimentoChange}
+          onSave={onSave}
+          onCancel={onCancel}
+          // novas props
+          newDataPagamento={newDataPagamento || ''}
+          onDataPagamentoChange={onDataPagamentoChange!}
+        />
       </div>
     );
   }

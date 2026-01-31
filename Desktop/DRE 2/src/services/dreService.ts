@@ -46,10 +46,30 @@ export class DREService {
     const impostosSobreLucro = valoresPorCategoria['Impostos sobre Lucro'] || 0;
     const lucroLiquido = resultadoAntesIR - impostosSobreLucro;
 
+    // Debug logs para investigar margem líquida
+    console.log('=== DEBUG DRE CALCULATION ===');
+    console.log('Receita Líquida:', receitaLiquida);
+    console.log('Custo Vendas:', custos);
+    console.log('Despesas Operacionais:', despesasOperacionais);
+    console.log('Despesas Financeiras:', despesasFinanceiras);
+    console.log('Receitas Financeiras:', receitasFinanceiras);
+    console.log('Impostos:', impostosSobreLucro);
+    console.log('Lucro Bruto:', lucroBruto);
+    console.log('Lucro Operacional:', resultadoOperacional);
+    console.log('Lucro Antes Impostos:', resultadoAntesIR);
+    console.log('Lucro Líquido:', lucroLiquido);
+    console.log('Total de lançamentos:', lancamentos.length);
+    console.log('Total de contas:', contasContabeis.length);
+
     // Calcular margens
     const margemBruta = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
     const margemOperacional = receitaLiquida > 0 ? (resultadoOperacional / receitaLiquida) * 100 : 0;
     const margemLiquida = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
+    
+    console.log('Margem Bruta:', margemBruta + '%');
+    console.log('Margem Operacional:', margemOperacional + '%');
+    console.log('Margem Líquida:', margemLiquida + '%');
+    console.log('==============================');
 
     return {
       empresaId,
@@ -160,20 +180,38 @@ export class DREService {
     variacaoLucroLiquido: number;
     variacaoMargemLiquida: number;
   } {
-    const variacaoReceita = dre1.receitaLiquida > 0 
-      ? ((dre2.receitaLiquida - dre1.receitaLiquida) / dre1.receitaLiquida) * 100 
-      : 0;
+    // Debug logs
+    console.log('DREService.compararPeriodos Debug:', {
+      dre1: { receitaLiquida: dre1.receitaLiquida, lucroLiquido: dre1.lucroLiquido, margemLiquida: dre1.margemLiquida },
+      dre2: { receitaLiquida: dre2.receitaLiquida, lucroLiquido: dre2.lucroLiquido, margemLiquida: dre2.margemLiquida }
+    });
+
+    // Verificar se há dados válidos no período anterior
+    if (!dre1 || dre1.receitaLiquida <= 0) {
+      console.log('Período anterior sem dados válidos para comparação');
+      return {
+        variacaoReceita: 0,
+        variacaoLucroLiquido: 0,
+        variacaoMargemLiquida: 0
+      };
+    }
+
+    const variacaoReceita = ((dre2.receitaLiquida - dre1.receitaLiquida) / dre1.receitaLiquida) * 100;
 
     const variacaoLucroLiquido = dre1.lucroLiquido !== 0 
       ? ((dre2.lucroLiquido - dre1.lucroLiquido) / Math.abs(dre1.lucroLiquido)) * 100 
-      : 0;
+      : (dre2.lucroLiquido > 0 ? 100 : 0); // Se anterior era 0 e atual é positivo, considerar 100% de melhoria
 
     const variacaoMargemLiquida = dre2.margemLiquida - dre1.margemLiquida;
 
-    return {
+    const resultado = {
       variacaoReceita,
       variacaoLucroLiquido,
       variacaoMargemLiquida
     };
+
+    console.log('Resultado da comparação:', resultado);
+
+    return resultado;
   }
 }

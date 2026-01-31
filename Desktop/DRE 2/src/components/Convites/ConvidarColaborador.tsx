@@ -1,29 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PermissionGuard } from '../PermissionGuard';
 import { CollaboratorsService } from '../../services/collaboratorsService';
 import { Spinner } from '../ui/Spinner';
-import { Mail, UserPlus, Check, AlertCircle, X } from 'lucide-react';
+import { Mail, UserPlus, Check, AlertCircle, X, Copy, Link } from 'lucide-react';
 
 interface ConvidarColaboradorProps {
   companyId: string;
   onInviteSent?: () => void;
   onCancel?: () => void;
   className?: string;
+  initialShowForm?: boolean;
 }
 
 export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
   companyId,
   onInviteSent,
   onCancel,
-  className = ''
+  className = '',
+  initialShowForm = false
 }) => {
   const { hasPermission } = usePermissions(companyId);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(initialShowForm);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const linkRef = useRef<HTMLInputElement>(null);
 
   const roles = {
     admin: {
@@ -57,8 +61,11 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
       if (result.success) {
         setMessage({ 
           type: 'success', 
-          text: 'Convite enviado com sucesso! O colaborador receberá um email com as instruções.' 
+          text: 'Convite criado com sucesso! Compartilhe o link de convite com o colaborador.' 
         });
+        
+        // Set invite link
+        setInviteLink(result.inviteLink || `${window.location.origin}/convite/${result.inviteId}`);
         
         // Reset form
         setEmail('');
@@ -66,12 +73,6 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
         
         // Call callback
         onInviteSent?.();
-        
-        // Auto-hide form after success
-        setTimeout(() => {
-          setShowForm(false);
-          setMessage(null);
-        }, 3000);
       } else {
         setMessage({ 
           type: 'error', 
@@ -159,6 +160,35 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
             </button>
           </div>
         )}
+        
+        {/* Invite Link */}
+        {inviteLink && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2 mb-2">
+              <Link className="h-4 w-4 text-blue-600" />
+              <h4 className="text-sm font-medium text-blue-800">Link de convite</h4>
+            </div>
+            <div className="flex items-center mt-2">
+              <input
+                ref={linkRef}
+                type="text"
+                value={inviteLink}
+                readOnly
+                className="flex-1 p-2 text-sm border border-blue-300 rounded-l-lg bg-white"
+              />
+              <button
+                onClick={() => {
+                  linkRef.current?.select();
+                  document.execCommand('copy');
+                }}
+                className="bg-blue-600 text-white p-2 rounded-r-lg hover:bg-blue-700 transition-colors"
+                title="Copiar link"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Field */}
@@ -223,12 +253,12 @@ export const ConvidarColaborador: React.FC<ConvidarColaboradorProps> = ({
               {loading ? (
                 <>
                   <Spinner size="sm" />
-                  <span>Enviando...</span>
+                  <span>Criando...</span>
                 </>
               ) : (
                 <>
-                  <Mail className="h-4 w-4" />
-                  <span>Enviar Convite</span>
+                  <UserPlus className="h-4 w-4" />
+                  <span>Criar Convite</span>
                 </>
               )}
             </button>

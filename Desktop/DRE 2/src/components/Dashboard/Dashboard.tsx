@@ -7,8 +7,11 @@ import { RevenueChart } from './RevenueChart';
 import { MargensEvolutionChart } from './MargensEvolutionChart';
 import { DREStructureChart } from './DREStructureChart';
 import { LancamentosDebitoChart } from './LancamentosDebitoChart';
-import { IndicadoresMelhoriaGuide } from './IndicadoresMelhoriaGuide';
 import { ProjecaoMelhoriaChart } from './ProjecaoMelhoriaChart';
+import IndicadoresPerformanceChart from './IndicadoresPerformanceChart';
+import { PeriodFilter } from './PeriodFilter';
+import { usePeriodFilter } from './hooks/usePeriodFilter';
+
 
 import { Spinner } from '../ui/Spinner';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -30,6 +33,20 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
+  
+  // Hook para gerenciar filtros de período
+  const {
+    selectedPeriod,
+    customStartDate,
+    customEndDate,
+    periodRange,
+    previousPeriodRange,
+    handlePeriodChange,
+    handleCustomDateChange,
+    formatDateForAPI,
+    isDateInRange,
+    getPeriodLabel,
+  } = usePeriodFilter();
 
   console.log('📊 [DEBUG] Dashboard - Componente renderizado');
   console.log('📊 [DEBUG] Dashboard - loading:', loading, 'data:', !!data, 'error:', error);
@@ -44,6 +61,9 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     console.log('📊 [DEBUG] Dashboard - useEffect iniciado');
+    console.log('📊 [DEBUG] Dashboard - Período selecionado:', selectedPeriod, getPeriodLabel());
+    console.log('📊 [DEBUG] Dashboard - Range atual:', formatDateForAPI(periodRange.startDate), 'a', formatDateForAPI(periodRange.endDate));
+    console.log('📊 [DEBUG] Dashboard - Range anterior:', formatDateForAPI(previousPeriodRange.startDate), 'a', formatDateForAPI(previousPeriodRange.endDate));
     
     // Se ainda está carregando empresas, aguardar
     if (companiesLoading) {
@@ -101,20 +121,60 @@ export const Dashboard: React.FC = () => {
         const lancamentos = lancamentosRes.data as unknown as Lancamento[];
         const contas = contasRes.data as unknown as ContaContabil[];
 
-        const anoAtual = new Date();
-        const anoAnterior = subYears(anoAtual, 1);
+        // Calcular DRE baseado no período filtrado
+        const dreAtual = DREService.calcularDRE(
+          lancamentos, 
+          contas, 
+          empresaId, 
+          formatDateForAPI(periodRange.startDate), 
+          formatDateForAPI(periodRange.endDate)
+        );
+        
+        const dreAnterior = DREService.calcularDRE(
+          lancamentos, 
+          contas, 
+          empresaId, 
+          formatDateForAPI(previousPeriodRange.startDate), 
+          formatDateForAPI(previousPeriodRange.endDate)
+        );
 
-        const dreAtual = DREService.calcularDRE(lancamentos, contas, empresaId, format(startOfYear(anoAtual), 'yyyy-MM-dd'), format(endOfYear(anoAtual), 'yyyy-MM-dd'));
-        const dreAnterior = DREService.calcularDRE(lancamentos, contas, empresaId, format(startOfYear(anoAnterior), 'yyyy-MM-dd'), format(endOfYear(anoAnterior), 'yyyy-MM-dd'));
-
-        // For monthly chart
+        // Histórico mensal baseado no período filtrado
         const historicoMensal: DREPeriodo[] = [];
-        for (let i = 0; i < 12; i++) {
-          const mes = new Date(anoAtual.getFullYear(), i, 1);
-          const inicioMes = format(mes, 'yyyy-MM-dd');
-          const fimMes = format(new Date(anoAtual.getFullYear(), i + 1, 0), 'yyyy-MM-dd');
-          historicoMensal.push(DREService.calcularDRE(lancamentos, contas, empresaId, inicioMes, fimMes));
-        }
+        
+        // Filtrar lançamentos dentro do período selecionado
+        const lancamentosFiltrados = lancamentos.filter(lancamento => {
+          if (lancamento.empresaId !== empresaId) return false;
+          const dataLancamento = new Date(lancamento.data);
+          return isDateInRange(dataLancamento, periodRange);
+        });
+        
+        // Identificar meses únicos com lançamentos no período filtrado
+        const mesesComLancamentos = new Set<string>();
+        lancamentosFiltrados.forEach(lancamento => {
+          const dataLancamento = new Date(lancamento.data);
+          const chaveAnoMes = `${dataLancamento.getFullYear()}-${dataLancamento.getMonth()}`;
+          mesesComLancamentos.add(chaveAnoMes);
+        });
+        
+        console.log(`Meses com lançamentos no período filtrado: ${Array.from(mesesComLancamentos).length}`);
+        
+        // Processar cada mês com lançamentos
+        Array.from(mesesComLancamentos).sort().forEach(chaveAnoMes => {
+          const [ano, mes] = chaveAnoMes.split('-').map(Number);
+          const inicioMes = new Date(ano, mes, 1);
+          const fimMes = new Date(ano, mes + 1, 0);
+          
+          const dreMes = DREService.calcularDRE(
+            lancamentos, 
+            contas, 
+            empresaId, 
+            format(inicioMes, 'yyyy-MM-dd'), 
+            format(fimMes, 'yyyy-MM-dd')
+          );
+          
+          console.log(`Mês ${mes + 1}/${ano}: Receita: ${dreMes.receitaLiquida}, Margem: ${dreMes.margemLiquida}%`);
+          historicoMensal.push(dreMes);
+        });
 
         setData({ 
           dreAtual, 
@@ -134,7 +194,7 @@ export const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, [companiesLoading, companies, selectedCompany]);
+  }, [companiesLoading, companies, selectedCompany, periodRange, previousPeriodRange]);
 
   // Se está carregando empresas, mostrar spinner
   if (companiesLoading) {
@@ -210,7 +270,20 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-
+      {/* Filtro de Período */}
+      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Filtros de Período</h3>
+          <span className="text-sm text-gray-600">Período atual: {getPeriodLabel()}</span>
+        </div>
+        <PeriodFilter
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={handlePeriodChange}
+          customStartDate={customStartDate}
+          customEndDate={customEndDate}
+          onCustomDateChange={handleCustomDateChange}
+        />
+      </div>
       
       {/* Cards de resumo */}
       <DashboardCards dreAtual={data.dreAtual} dreAnterior={data.dreAnterior} />
@@ -223,9 +296,22 @@ export const Dashboard: React.FC = () => {
       
 
       
-      {/* Análise de Lançamentos de Débito */}
-      <div className="grid grid-cols-1 gap-6">
-        <LancamentosDebitoChart empresaId={data.empresaId} />
+      {/* Análise de Lançamentos de Débito e Indicadores de Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LancamentosDebitoChart 
+          empresaId={data.empresaId}
+          lancamentos={data.lancamentos}
+          contasContabeis={data.contasContabeis}
+          startDate={formatDateForAPI(periodRange.startDate)}
+          endDate={formatDateForAPI(periodRange.endDate)}
+        />
+        <IndicadoresPerformanceChart 
+          empresaId={data.empresaId}
+          lancamentos={data.lancamentos}
+          contasContabeis={data.contasContabeis}
+          startDate={formatDateForAPI(periodRange.startDate)}
+          endDate={formatDateForAPI(periodRange.endDate)}
+        />
       </div>
       
       {/* Estrutura do DRE */}
@@ -240,10 +326,6 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
       
-      {/* Quinta linha - guia de melhoria de indicadores */}
-      <div className="grid grid-cols-1 gap-6">
-        <IndicadoresMelhoriaGuide dre={data.dreAtual} />
-      </div>
     </div>
   );
 };

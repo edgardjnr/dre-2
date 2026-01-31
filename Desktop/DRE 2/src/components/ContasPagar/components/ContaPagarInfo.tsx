@@ -1,7 +1,80 @@
-import React from 'react';
-import { ContaPagar, ContaContabil } from '../../../types';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, DollarSign, Building, FileText, Hash, Image } from 'lucide-react';
+import { Building, FileText, DollarSign, Calendar, Hash, Copy, Check, Image } from 'lucide-react';
+import { ContaPagar, ContaContabil } from '../../../types';
+
+// Função para formatar data para exibição sem problemas de timezone
+const formatDateForDisplay = (dateString: string): Date => {
+  if (!dateString) return new Date();
+  // Adiciona horário fixo para evitar problemas de timezone na exibição
+  return new Date(dateString + 'T00:00:00');
+};
+
+// Função para formatar valores monetários
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
+
+// Função para detectar o tipo de documento (Código de Barras ou PIX)
+const detectDocumentType = (numeroDocumento: string): string => {
+  if (!numeroDocumento) return 'Código de Barras';
+  
+  const documento = numeroDocumento.trim();
+  console.log('DEBUG - Detectando tipo do documento:', documento);
+  
+  // Se tem mais de 44 caracteres, é código de barras
+  if (documento.length > 44) {
+    console.log('DEBUG - Detectado como Código de Barras (mais de 44 caracteres)');
+    return 'Código de Barras';
+  }
+  
+  // Verificar se é CPF (formato: 000.000.000-00 ou 00000000000)
+  const cpfRegex = /^\d{3}\.\d{3}\.\d{3}-\d{2}$|^\d{11}$/;
+  if (cpfRegex.test(documento)) {
+    console.log('DEBUG - Detectado como PIX (CPF)');
+    return 'PIX';
+  }
+  
+  // Verificar se é celular brasileiro com diferentes formatos
+  // Aceita: (11) 99999-9999, 11 99999-9999, 11999999999, +5511999999999
+  const documentoLimpo = documento.replace(/\D/g, '');
+  const celularRegex = /^(55)?\d{2}9\d{8}$/;
+  if (celularRegex.test(documentoLimpo) && documentoLimpo.length >= 11) {
+    console.log('DEBUG - Detectado como PIX (Celular)');
+    return 'PIX';
+  }
+  
+  // Verificar se é email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (emailRegex.test(documento)) {
+    console.log('DEBUG - Detectado como PIX (Email)');
+    return 'PIX';
+  }
+  
+  // Verificar se é CNPJ (formato: 00.000.000/0000-00 ou 00000000000000)
+  // Melhorado para aceitar espaços
+  const cnpjLimpo = documento.replace(/[\s.-\/]/g, '');
+  const cnpjRegex = /^\d{14}$/;
+  if (cnpjRegex.test(cnpjLimpo)) {
+    console.log('DEBUG - Detectado como PIX (CNPJ)');
+    return 'PIX';
+  }
+  
+  // Verificar se é chave aleatória (UUID ou 32 caracteres alfanuméricos)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const chaveAleatoria32Regex = /^[0-9a-f]{32}$/i;
+  if (uuidRegex.test(documento) || chaveAleatoria32Regex.test(documento)) {
+    console.log('DEBUG - Detectado como PIX (Chave Aleatória)');
+    return 'PIX';
+  }
+  
+  // Padrão: Código de Barras
+  console.log('DEBUG - Detectado como Código de Barras (padrão)');
+  return 'Código de Barras';
+};
 
 interface ContaPagarInfoProps {
   conta: ContaPagar;
@@ -10,19 +83,25 @@ interface ContaPagarInfoProps {
   onImageClick: (imageUrl: string, imageName: string) => void;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
-
-// Remover a função getTipoDocumentoText (linhas 19-25)
-
 export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }: ContaPagarInfoProps) {
+  const [copiado, setCopiado] = useState(false);
+
   const getContaContabilNome = (contaContabilId: string | null) => {
     if (!contaContabilId) return 'Não definida';
     const contaContabil = contasContabeis.find(c => c.id === contaContabilId);
     return contaContabil ? `${contaContabil.codigo} - ${contaContabil.nome}` : 'Não encontrada';
+  };
+
+  const copiarCodigoBarras = async () => {
+    if (!conta.numeroDocumento) return;
+    
+    try {
+      await navigator.clipboard.writeText(conta.numeroDocumento);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (error) {
+      console.error('Erro ao copiar código de barras:', error);
+    }
   };
 
   return (
@@ -62,7 +141,7 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
               <Calendar className="w-4 h-4 mr-2" />
               Data de Vencimento
             </label>
-            <p className="text-gray-900">{format(new Date(conta.dataVencimento), 'dd/MM/yyyy')}</p>
+            <p className="text-gray-900">{format(formatDateForDisplay(conta.dataVencimento), 'dd/MM/yyyy')}</p>
           </div>
 
           {conta.dataPagamento && (
@@ -71,7 +150,7 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
                 <Calendar className="w-4 h-4 mr-2" />
                 Data de Pagamento
               </label>
-              <p className="text-green-600 font-medium">{format(new Date(conta.dataPagamento), 'dd/MM/yyyy')}</p>
+              <p className="text-green-600 font-medium">{format(formatDateForDisplay(conta.dataPagamento), 'dd/MM/yyyy')}</p>
             </div>
           )}
         </div>
@@ -82,9 +161,27 @@ export function ContaPagarInfo({ conta, empresa, contasContabeis, onImageClick }
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 <Hash className="w-4 h-4 mr-2" />
-                Descrição
+                {detectDocumentType(conta.numeroDocumento)}
               </label>
-              <p className="text-gray-900">{conta.numeroDocumento}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-gray-900 font-mono text-sm bg-gray-50 px-3 py-2 rounded border flex-1 break-all">
+                  {conta.numeroDocumento}
+                </p>
+                <button
+                  onClick={copiarCodigoBarras}
+                  className="flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded border transition-colors"
+                  title="Copiar código de barras"
+                >
+                  {copiado ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {copiado && (
+                <p className="text-sm text-green-600 mt-1">Código copiado!</p>
+              )}
             </div>
           )}
 

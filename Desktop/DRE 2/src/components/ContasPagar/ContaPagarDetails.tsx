@@ -5,7 +5,7 @@ import { StatusControl } from './components/StatusControl';
 import { ContaPagarInfo } from './components/ContaPagarInfo';
 import { ImageModal } from './components/ImageModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { useContaPagarStatus } from './hooks/useContaPagarStatus';
+import { useEditConta } from './hooks/useEditConta';
 import { useDRELancamento } from './hooks/useDRELancamento';
 
 interface ContaPagarDetailsProps {
@@ -19,7 +19,14 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   
-  const statusControl = useContaPagarStatus(conta.status, conta.id, onUpdate);
+  const editControl = useEditConta(
+    conta.id,
+    conta.status,
+    conta.valor,
+    conta.dataVencimento,
+    conta.dataPagamento || null,
+    onUpdate
+  );
   const dreService = useDRELancamento(onUpdate);
 
   // Buscar contas contábeis
@@ -58,27 +65,33 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Header com controle de status */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Detalhes da Conta</h2>
-        <div className="flex items-center space-x-3">
+      <div className={`${editControl.editing ? 'w-full' : 'flex justify-end'}`}>
+        <div className={`${editControl.editing ? 'w-full' : 'flex items-center space-x-3'}`}>
           <StatusControl
             currentStatus={conta.status}
-            editingStatus={statusControl.editingStatus}
-            newStatus={statusControl.newStatus}
-            loading={statusControl.loading}
-            onStartEdit={() => statusControl.setEditingStatus(true)}
-            onStatusChange={statusControl.setNewStatus}
-            onSave={statusControl.handleStatusChange}
-            onCancel={() => {
-              statusControl.setEditingStatus(false);
-              statusControl.setNewStatus(conta.status);
-            }}
+            currentValor={conta.valor}
+            currentDataVencimento={conta.dataVencimento}
+            editing={editControl.editing}
+            newStatus={editControl.newStatus}
+            newValor={editControl.newValor}
+            newDataVencimento={editControl.newDataVencimento}
+            loading={editControl.loading}
+            onStartEdit={() => editControl.setEditing(true)}
+            onStatusChange={editControl.setNewStatus}
+            onValorChange={editControl.setNewValor}
+            onDataVencimentoChange={editControl.setNewDataVencimento}
+            onSave={editControl.handleSave}
+            onCancel={editControl.handleCancel}
+            // Novas props para data de pagamento
+            newDataPagamento={editControl.newDataPagamento}
+            onDataPagamentoChange={editControl.setNewDataPagamento}
           />
         </div>
       </div>
 
       {/* Informações principais */}
-      <ContaPagarInfo
+      <div className={editControl.editing ? 'mt-6' : ''}>
+        <ContaPagarInfo
         conta={conta}
         empresa={empresa}
         contasContabeis={contasContabeis}
@@ -87,6 +100,7 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
           setShowImageModal(true);
         }}
       />
+      </div>
 
       {/* Modal de visualização da imagem */}
       {showImageModal && selectedImage && (
@@ -99,19 +113,17 @@ export function ContaPagarDetails({ conta, empresa, onUpdate }: ContaPagarDetail
             setShowImageModal(false);
             setSelectedImage(null);
           }}
-          onGerarLancamento={() => dreService.gerarLancamentoDRE(conta)}
-          loadingLancamento={dreService.loading}
         />
       )}
 
       {/* Modal de confirmação */}
       <ConfirmationModal
-        isOpen={statusControl.showConfirmModal}
-        title="Confirmar Pagamento"
-        message="Ao marcar esta conta como paga, será gerado automaticamente um lançamento no DRE. Deseja continuar?"
-        loading={statusControl.loading}
-        onConfirm={statusControl.confirmStatusChange}
-        onCancel={statusControl.cancelStatusChange}
+        isOpen={editControl.showConfirmModal}
+        title="Confirmar Alterações"
+        message="Ao marcar esta conta como paga, será gerado automaticamente um lançamento no DRE com o valor informado. Deseja continuar?"
+        loading={editControl.loading}
+        onConfirm={editControl.confirmSave}
+        onCancel={editControl.cancelSave}
       />
     </div>
   );

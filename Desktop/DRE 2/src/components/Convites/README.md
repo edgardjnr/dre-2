@@ -324,7 +324,7 @@ Use o modo de desenvolvimento para ver informações de debug:
 
 - [Documentação do Supabase Auth](https://supabase.com/docs/guides/auth)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
-- [Configuração de SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
+- [Configuração de Email no Supabase](https://supabase.com/docs/guides/auth/auth-smtp)
 
 ---
 

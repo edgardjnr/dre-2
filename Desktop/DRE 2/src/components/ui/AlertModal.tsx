@@ -68,7 +68,7 @@ export const AlertModal: React.FC<AlertModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4 animate-fade-in"
       onClick={handleBackdropClick}
     >
       <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full transform transition-all duration-300 animate-scale-in">

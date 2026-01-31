@@ -22,6 +22,11 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
+  // Não interceptar requisições para APIs externas
+  if (event.request.url.includes('supabase.co/functions/v1/')) {
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -29,9 +34,15 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(event.request);
-      }
-    )
+        return fetch(event.request).catch(error => {
+          console.log('Fetch falhou:', error);
+          // Retornar uma resposta de erro personalizada
+          return new Response(JSON.stringify({ error: 'Falha na conexão de rede' }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 503
+          });
+        });
+      })
   );
 });
 

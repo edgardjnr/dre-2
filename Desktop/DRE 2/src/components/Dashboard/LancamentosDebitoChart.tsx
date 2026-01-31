@@ -6,6 +6,10 @@ import { AnimatedPieChart } from './AnimatedPieChart';
 
 interface LancamentosDebitoChartProps {
   empresaId: string;
+  lancamentos?: Lancamento[];
+  contasContabeis?: ContaContabil[];
+  startDate?: string;
+  endDate?: string;
 }
 
 interface DebitosPorConta {
@@ -25,7 +29,13 @@ interface DebitosPorCategoria {
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-export const LancamentosDebitoChart: React.FC<LancamentosDebitoChartProps> = ({ empresaId }) => {
+export const LancamentosDebitoChart: React.FC<LancamentosDebitoChartProps> = ({ 
+  empresaId, 
+  lancamentos: lancamentosProps, 
+  contasContabeis: contasProps, 
+  startDate, 
+  endDate 
+}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
@@ -38,9 +48,14 @@ export const LancamentosDebitoChart: React.FC<LancamentosDebitoChartProps> = ({ 
 
   useEffect(() => {
     if (empresaId) {
-      fetchData();
+      // Se os dados já foram passados como props, usar eles
+      if (lancamentosProps && contasProps) {
+        processarDadosFiltrados();
+      } else {
+        fetchData();
+      }
     }
-  }, [empresaId]);
+  }, [empresaId, lancamentosProps, contasProps, startDate, endDate]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -102,6 +117,38 @@ export const LancamentosDebitoChart: React.FC<LancamentosDebitoChartProps> = ({ 
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar dados');
       console.error('Erro ao buscar dados:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processarDadosFiltrados = () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Filtrar lançamentos por período se startDate e endDate foram fornecidos
+      let lancamentosFiltrados = lancamentosProps?.filter(l => l.tipo === 'Débito') || [];
+      
+      if (startDate && endDate) {
+        lancamentosFiltrados = lancamentosFiltrados.filter(lancamento => {
+          const dataLancamento = new Date(lancamento.data);
+          const inicio = new Date(startDate);
+          const fim = new Date(endDate);
+          return dataLancamento >= inicio && dataLancamento <= fim;
+        });
+      }
+
+      setContas(contasProps || []);
+      setLancamentos(lancamentosFiltrados);
+
+      // Calcular dados para os gráficos
+      calcularDebitosPorConta(lancamentosFiltrados, contasProps || []);
+      calcularDebitosPorCategoria(lancamentosFiltrados, contasProps || []);
+
+    } catch (err: any) {
+      setError(err.message || 'Erro ao processar dados filtrados');
+      console.error('Erro ao processar dados filtrados:', err);
     } finally {
       setLoading(false);
     }
@@ -277,40 +324,23 @@ export const LancamentosDebitoChart: React.FC<LancamentosDebitoChartProps> = ({ 
         </div>
       </div>
 
-      {/* Gráfico de Pizza - Débitos por Categoria */}
+      {/* Gráfico de Pizza - Débitos por Conta Contábil */}
       <div className="mb-6">
         <div className="h-[450px]">
           <AnimatedPieChart
-            data={dadosDebitosPorCategoria.map((item, index) => ({
-              name: item.categoria,
+            data={dadosDebitosPorConta.slice(0, 10).map((item, index) => ({
+              name: item.contaNome,
               y: item.totalDebitos,
               color: COLORS[index % COLORS.length]
             }))}
-            title="Débitos por Categoria"
-            subtitle="Distribuição dos lançamentos de débito"
-            containerId="debitos-categoria-chart"
+            title="Débitos por Conta Contábil"
+            subtitle="Distribuição dos débitos por conta específica"
+            containerId="debitos-conta-chart"
           />
         </div>
       </div>
 
-      {/* Lista Detalhada */}
-      <div>
-        <h4 className="text-md font-medium text-gray-900 mb-3">Detalhamento por Conta Contábil</h4>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {dadosDebitosPorConta.map((item, index) => (
-            <div key={item.contaId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">{item.contaNome}</p>
-                <p className="text-sm text-gray-600">{item.categoria}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-red-600">{formatCurrency(item.totalDebitos)}</p>
-                <p className="text-sm text-gray-500">{item.quantidadeLancamentos} lançamentos</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+
     </div>
   );
 };
