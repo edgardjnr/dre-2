@@ -24,10 +24,11 @@ const detectDocumentType = (numeroDocumento: string): string => {
   if (!numeroDocumento) return 'Código de Barras';
   
   const documento = numeroDocumento.trim();
+  const apenasDigitos = documento.replace(/\D/g, '');
   console.log('DEBUG - Detectando tipo do documento:', documento);
   
-  // Se tem mais de 44 caracteres, é código de barras
-  if (documento.length > 44) {
+  // Boleto: 44 (código de barras) e 47/48 (linha digitável)
+  if (apenasDigitos.length === 44 || apenasDigitos.length === 47 || apenasDigitos.length === 48) {
     console.log('DEBUG - Detectado como Código de Barras (mais de 44 caracteres)');
     return 'Código de Barras';
   }

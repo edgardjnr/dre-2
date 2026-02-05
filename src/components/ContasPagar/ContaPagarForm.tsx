@@ -437,10 +437,11 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const detectarTipoDocumento = (valor: string): 'codigo_barras' | 'pix' | 'padrao' => {
     if (!valor || valor.trim() === '') return 'padrao';
     
-    const valorLimpo = valor.replace(/\s/g, '');
+    const valorLimpo = valor.trim();
+    const apenasDigitos = valorLimpo.replace(/\D/g, '');
     
-    // Código de barras: mais de 44 caracteres numéricos
-    if (valorLimpo.length > 44 && /^\d+$/.test(valorLimpo)) {
+    // Código de barras / linha digitável (boleto costuma ser 44 dígitos no código de barras, 47/48 na linha digitável)
+    if (apenasDigitos.length === 44 || apenasDigitos.length === 47 || apenasDigitos.length === 48) {
       return 'codigo_barras';
     }
     
@@ -451,17 +452,17 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     }
     
     // Celular (formato brasileiro)
-    if (/^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$/.test(valorLimpo) || /^\d{10,11}$/.test(valorLimpo)) {
+    if (/^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$/.test(valorLimpo) || /^\d{10,11}$/.test(apenasDigitos)) {
       return 'pix';
     }
     
     // CNPJ
-    if (/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(valorLimpo) || /^\d{14}$/.test(valorLimpo)) {
+    if (/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(valorLimpo) || apenasDigitos.length === 14) {
       return 'pix';
     }
     
     // CPF
-    if (/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(valorLimpo) || /^\d{11}$/.test(valorLimpo)) {
+    if (/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(valorLimpo) || apenasDigitos.length === 11) {
       return 'pix';
     }
     

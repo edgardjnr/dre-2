@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Camera, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Camera, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
-import QrBarcodeScanner from 'react-qr-barcode-scanner';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 interface BarcodeScannerProps {
   scannerAtivo: boolean;
@@ -21,8 +22,29 @@ export function BarcodeScanner({
   const [scannerErro, setScannerErro] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
+  const [isDecodingImage, setIsDecodingImage] = useState(false);
   
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+
+  const hints = useMemo(() => {
+    const map = new Map();
+    map.set(DecodeHintType.TRY_HARDER, true);
+    map.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.ITF,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.QR_CODE
+    ]);
+    return map;
+  }, []);
 
   // Função para forçar orientação landscape
   const forceOrientationLandscape = async () => {
@@ -69,14 +91,17 @@ export function BarcodeScanner({
       if (scannerTimeoutRef.current) {
         clearTimeout(scannerTimeoutRef.current);
       }
+      if (stopRef.current) {
+        stopRef.current();
+        stopRef.current = null;
+      }
     };
   }, []);
 
   // Função para processar o código de barras lido
-  const handleBarcodeDetected = (result: any) => {
-    if (result && result.text && !isScanning) {
+  const handleBarcodeTextDetected = (barcodeData: string) => {
+    if (barcodeData && !isScanning) {
       setIsScanning(true);
-      const barcodeData = result.text;
       console.log('Código de barras detectado:', barcodeData);
       
       // Vibração se disponível
@@ -143,6 +168,112 @@ export function BarcodeScanner({
     setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
+  const decodeFromImageFile = async (file: File) => {
+    if (!file) return;
+    setIsDecodingImage(true);
+    setScannerErro(null);
+
+    if (stopRef.current) {
+      stopRef.current();
+      stopRef.current = null;
+    }
+
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new window.Image();
+      img.decoding = 'async';
+      img.src = url;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Falha ao carregar a imagem'));
+      });
+
+      const reader = new BrowserMultiFormatReader(hints, 200);
+      readerRef.current = reader;
+      const result = await reader.decodeFromImageElement(img);
+      handleBarcodeTextDetected(String(result.getText() || '').trim());
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      if (msg.includes('NotFoundException') || msg.includes('No MultiFormat Readers were able to detect the code')) {
+        setScannerErro('Não foi possível ler o código na foto. Tente aproximar mais e melhorar a iluminação.');
+      } else {
+        setScannerErro(`Erro ao ler foto: ${msg || 'tente novamente'}`);
+      }
+    } finally {
+      URL.revokeObjectURL(url);
+      setIsDecodingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (scannerAtivo) {
+        void startScanner();
+      }
+    }
+  };
+
+  const startScanner = async () => {
+    if (!videoRef.current) return;
+
+    if (stopRef.current) {
+      stopRef.current();
+      stopRef.current = null;
+    }
+
+    const reader = new BrowserMultiFormatReader(hints, 200);
+    readerRef.current = reader;
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: cameraFacing,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      const controls = await reader.decodeFromConstraints(constraints, videoRef.current, (result, err) => {
+        if (result) {
+          handleBarcodeTextDetected(String(result.getText() || '').trim());
+          return;
+        }
+        if (err) {
+          const msg = String((err as any).message || '');
+          if (
+            msg.includes('NotFoundException') ||
+            msg.includes('No MultiFormat Readers were able to detect the code') ||
+            msg.includes('No code found')
+          ) {
+            return;
+          }
+          handleScannerError(err);
+        }
+      });
+
+      stopRef.current = () => {
+        try {
+          controls.stop();
+        } catch {}
+        try {
+          reader.reset();
+        } catch {}
+      };
+    } catch (error: any) {
+      handleScannerError(error);
+    }
+  };
+
+  useEffect(() => {
+    if (!scannerAtivo) return;
+    setScannerErro(null);
+    setIsScanning(false);
+    void startScanner();
+    return () => {
+      if (stopRef.current) {
+        stopRef.current();
+        stopRef.current = null;
+      }
+    };
+  }, [scannerAtivo, cameraFacing]);
+
   if (!scannerAtivo) return null;
 
   // Se houver erro, mostrar tela de erro
@@ -189,32 +320,11 @@ export function BarcodeScanner({
         zIndex: 9999,
         backgroundColor: 'black'
       }}>
-        <QrBarcodeScanner
-          width="100%"
-          height="100%"
-          onUpdate={(err, result) => {
-            console.log('Scanner onUpdate chamado:', { err, result });
-            if (result) {
-              console.log('Código detectado:', result.text);
-              handleBarcodeDetected(result);
-            } else if (err && !err.message?.includes('No MultiFormat Readers')) {
-              // Só tratar erros que NÃO sejam de detecção normal
-              console.error('Erro no scanner onUpdate:', err);
-              handleScannerError(err);
-            }
-            // Ignorar erros de "não encontrou código" - isso é normal
-          }}
-          facingMode={cameraFacing}
-          constraints={{
-            video: {
-              facingMode: cameraFacing
-            }
-          }}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          className="w-full h-full object-cover"
         />
       </div>
           
@@ -293,19 +403,41 @@ export function BarcodeScanner({
               🔄 Landscape Mode | 📷 {cameraFacing === 'environment' ? 'Traseira' : 'Frontal'}
             </div>
             
-            {/* Botão de fechar - Maior e mais visível */}
-            <button
-              onClick={() => {
-                onClose();
-                setIsScanning(false);
-              }}
-              className="bg-red-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg"
-              title="Fechar scanner"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isDecodingImage}
+                className="bg-blue-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg disabled:opacity-50"
+                title="Ler pela foto"
+              >
+                <Image size={24} />
+              </button>
+
+              <button
+                onClick={() => {
+                  onClose();
+                  setIsScanning(false);
+                }}
+                className="bg-red-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg"
+                title="Fechar scanner"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
           
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void decodeFromImageFile(file);
+            }}
+          />
 
     </>
   );

@@ -1525,30 +1525,6 @@ export const ContasPagarList: React.FC = () => {
         </button>
       </div>
 
-      {/* Scanner de código de barras - Renderizado fora do modal */}
-      {scannerAtivo && (
-        <BarcodeScanner 
-          scannerAtivo={scannerAtivo}
-          scannerPermissaoNegada={scannerPermissaoNegada}
-          scannerError={scannerError}
-          onBarcodeDetected={(codigo: string) => {
-            // Callback para quando o código for detectado
-            if (contaParaScanner) {
-              // Aqui você pode implementar a lógica para atualizar a conta
-              console.log('Código detectado para conta:', contaParaScanner.id, 'Código:', codigo);
-            }
-            setScannerAtivo(false);
-            setContaParaScanner(null);
-          }}
-          onClose={() => {
-            setScannerAtivo(false);
-            setContaParaScanner(null);
-            setScannerError(null);
-            setScannerPermissaoNegada(false);
-          }}
-        />
-      )}
-
       {/* Modais */}
       <Modal 
         isOpen={showModal} 
