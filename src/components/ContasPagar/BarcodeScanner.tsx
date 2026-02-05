@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Image, X } from 'lucide-react';
+import { Camera, Flashlight, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
@@ -24,6 +24,8 @@ export function BarcodeScanner({
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -31,6 +33,7 @@ export function BarcodeScanner({
   const stopRef = useRef<(() => void) | null>(null);
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastCandidateRef = useRef<{ value: string; count: number; ts: number } | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const hints = useMemo(() => {
     const map = new Map();
@@ -82,11 +85,34 @@ export function BarcodeScanner({
     }
   };
 
+  const setTorch = async (enabled: boolean) => {
+    const track = videoTrackRef.current;
+    if (!track) {
+      setTorchOn(false);
+      return;
+    }
+    const caps = (track.getCapabilities ? (track.getCapabilities() as any) : null) as any;
+    if (!caps?.torch) {
+      setTorchOn(false);
+      return;
+    }
+    try {
+      await track.applyConstraints({ advanced: [{ torch: enabled }] } as any);
+      setTorchOn(enabled);
+    } catch (e: any) {
+      setTorchOn(false);
+      toast.error('Não foi possível controlar a lanterna neste dispositivo/navegador.');
+    }
+  };
+
   useEffect(() => {
     if (scannerAtivo) {
       void forceOrientationLandscape();
     } else {
       restoreOrientation();
+      setTorchSupported(false);
+      setTorchOn(false);
+      videoTrackRef.current = null;
     }
   }, [scannerAtivo]);
 
@@ -97,6 +123,7 @@ export function BarcodeScanner({
   useEffect(() => {
     return () => {
       if (scannerTimeoutRef.current) clearTimeout(scannerTimeoutRef.current);
+      void setTorch(false);
       stopScanner();
     };
   }, []);
@@ -183,6 +210,9 @@ export function BarcodeScanner({
 
     stopScanner();
     setScannerErro(null);
+    setTorchSupported(false);
+    setTorchOn(false);
+    videoTrackRef.current = null;
 
     const reader = new BrowserMultiFormatReader(hints, 200);
     readerRef.current = reader;
@@ -210,6 +240,16 @@ export function BarcodeScanner({
           controls.stop();
         } catch {}
       };
+
+      const stream = (videoRef.current.srcObject as MediaStream | null) || null;
+      const track = stream?.getVideoTracks?.()?.[0] || null;
+      videoTrackRef.current = track;
+      if (track && cameraFacing === 'environment') {
+        const caps = (track.getCapabilities ? (track.getCapabilities() as any) : null) as any;
+        setTorchSupported(Boolean(caps?.torch));
+      } else {
+        setTorchSupported(false);
+      }
     } catch (error: any) {
       handleScannerError(error);
     }
@@ -254,8 +294,11 @@ export function BarcodeScanner({
     if (!scannerAtivo) return;
     setIsScanning(false);
     lastCandidateRef.current = null;
+    setTorchOn(false);
+    setTorchSupported(false);
     void startScanner();
     return () => {
+      void setTorch(false);
       stopScanner();
     };
   }, [scannerAtivo, cameraFacing]);
@@ -395,6 +438,15 @@ export function BarcodeScanner({
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => void setTorch(!torchOn)}
+            disabled={!torchSupported}
+            className={`${torchOn ? 'bg-yellow-500' : 'bg-black bg-opacity-80'} text-white rounded-full p-4 hover:bg-opacity-95 transition-all duration-200 shadow-lg disabled:opacity-50`}
+            title={torchSupported ? (torchOn ? 'Desligar lanterna' : 'Ligar lanterna') : 'Lanterna indisponível'}
+          >
+            <Flashlight size={24} />
+          </button>
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isDecodingImage}
             className="bg-blue-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg disabled:opacity-50"
@@ -404,6 +456,7 @@ export function BarcodeScanner({
           </button>
           <button
             onClick={() => {
+              void setTorch(false);
               onClose();
               setIsScanning(false);
             }}
@@ -429,4 +482,3 @@ export function BarcodeScanner({
     </>
   );
 }
-
