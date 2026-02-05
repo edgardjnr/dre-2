@@ -12,11 +12,11 @@ const modulo10DV = (value: string): number => {
   return (10 - (sum % 10)) % 10;
 };
 
-const modulo11BoletoDV = (barcode44: string): number => {
+const modulo11BoletoDV = (digits43: string): number => {
   let sum = 0;
   let weight = 2;
-  for (let i = barcode44.length - 1; i >= 0; i--) {
-    const n = parseInt(barcode44[i], 10);
+  for (let i = digits43.length - 1; i >= 0; i--) {
+    const n = parseInt(digits43[i], 10);
     sum += n * weight;
     weight = weight === 9 ? 2 : weight + 1;
   }
@@ -59,8 +59,8 @@ export const isValidBarcode44 = (barcode44: string): boolean => {
   if (!/^\d{44}$/.test(d)) return false;
   if (d[0] === '8') return true;
   const dv = parseInt(d[4], 10);
-  const withoutDv = d.slice(0, 4) + '0' + d.slice(5);
-  const expected = modulo11BoletoDV(withoutDv);
+  const digits43 = d.slice(0, 4) + d.slice(5);
+  const expected = modulo11BoletoDV(digits43);
   return dv === expected;
 };
 
@@ -79,4 +79,3 @@ export const barcode44ToLinhaDigitavel47 = (barcode44: string): string => {
   const dv3 = modulo10DV(campo3);
   return `${campo1}${dv1}${campo2}${dv2}${campo3}${dv3}${dvGeral}${fatorValor}`;
 };
-

@@ -165,16 +165,19 @@ export function BarcodeScanner({
     if (!digits) return;
     if (digits.length !== 44 && digits.length !== 47 && digits.length !== 48) return;
 
-    if (digits.length === 47 && !isValidLinhaDigitavel47(digits)) {
+    const isValidBoleto47 = digits.length === 47 ? isValidLinhaDigitavel47(digits) : false;
+    const isValidBarcode44Value = digits.length === 44 ? isValidBarcode44(digits) : false;
+
+    if (digits.length === 47 && !isValidBoleto47) {
       toast.error('Leitura inválida (boleto). Tente novamente com mais foco/luz.');
       return;
     }
-    if (digits.length === 44 && !isValidBarcode44(digits)) {
+    if (digits.length === 44 && !isValidBarcode44Value) {
       toast.error('Leitura inválida (código de barras). Tente novamente.');
       return;
     }
 
-    if (source === 'live') {
+    if (source === 'live' && digits.length === 48) {
       const now = Date.now();
       const last = lastCandidateRef.current;
       if (!last || last.value !== digits || now - last.ts > 2000) {
