@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { barcode44ToLinhaDigitavel47, isValidBarcode44, isValidLinhaDigitavel47, normalizeDigits } from '../../utils/boletoUtils';
 
 interface BarcodeScannerProps {
@@ -11,31 +13,41 @@ interface BarcodeScannerProps {
   onClose: () => void;
 }
 
-export function BarcodeScanner({ 
-  scannerAtivo, 
-  scannerPermissaoNegada, 
-  scannerError, 
-  onBarcodeDetected, 
-  onClose 
+export function BarcodeScanner({
+  scannerAtivo,
+  scannerPermissaoNegada,
+  scannerError,
+  onBarcodeDetected,
+  onClose
 }: BarcodeScannerProps) {
   const [scannerErro, setScannerErro] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
-  const lastCandidateRef = useRef<{ value: string; count: number; ts: number } | null>(null);
-  
-  const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const quaggaRef = useRef<any>(null);
-  const isLiveRunningRef = useRef(false);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+  const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCandidateRef = useRef<{ value: string; count: number; ts: number } | null>(null);
 
-  const readers = useMemo(
-    () => ['i2of5_reader', 'code_128_reader', 'ean_reader', 'ean_8_reader', 'code_39_reader', 'upc_reader', 'upc_e_reader'],
-    []
-  );
+  const hints = useMemo(() => {
+    const map = new Map();
+    map.set(DecodeHintType.TRY_HARDER, true);
+    map.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.ITF,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.QR_CODE
+    ]);
+    return map;
+  }, []);
 
-  // Função para forçar orientação landscape
   const forceOrientationLandscape = async () => {
     try {
       if (screen.orientation && screen.orientation.lock) {
@@ -46,7 +58,6 @@ export function BarcodeScanner({
     }
   };
 
-  // Função para restaurar orientação
   const restoreOrientation = () => {
     try {
       if (screen.orientation && screen.orientation.unlock) {
@@ -57,301 +68,222 @@ export function BarcodeScanner({
     }
   };
 
-  // Efeito principal - executado quando scanner é ativado
+  const stopScanner = () => {
+    if (stopRef.current) {
+      try {
+        stopRef.current();
+      } catch {}
+      stopRef.current = null;
+    }
+    if (readerRef.current) {
+      try {
+        readerRef.current.reset();
+      } catch {}
+    }
+  };
+
   useEffect(() => {
     if (scannerAtivo) {
-      // Forçar orientação landscape
-      forceOrientationLandscape();
+      void forceOrientationLandscape();
     } else {
       restoreOrientation();
     }
   }, [scannerAtivo]);
 
-  // Efeito para erros externos
   useEffect(() => {
-    if (scannerError) {
-      setScannerErro(scannerError);
-    }
+    if (scannerError) setScannerErro(scannerError);
   }, [scannerError]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
-      if (scannerTimeoutRef.current) {
-        clearTimeout(scannerTimeoutRef.current);
-      }
-      if (isLiveRunningRef.current && quaggaRef.current) {
-        try {
-          quaggaRef.current.stop();
-        } catch {}
-        isLiveRunningRef.current = false;
-      }
+      if (scannerTimeoutRef.current) clearTimeout(scannerTimeoutRef.current);
+      stopScanner();
     };
   }, []);
 
-  // Função para processar o código de barras lido
-  const handleBarcodeTextDetected = (barcodeData: string, source: 'live' | 'image' = 'live') => {
-    if (barcodeData && !isScanning) {
-      const digits = normalizeDigits(barcodeData);
-      if (!digits) {
-        setIsScanning(false);
-        return;
-      }
-
-      if (digits.length !== 44 && digits.length !== 47 && digits.length !== 48) {
-        setIsScanning(false);
-        return;
-      }
-
-      if (digits.length === 47) {
-        if (!isValidLinhaDigitavel47(digits)) {
-          toast.error('Leitura inválida (boleto). Tente novamente com mais foco/luz.');
-          setIsScanning(false);
-          return;
-        }
-      } else if (digits.length === 44) {
-        if (!isValidBarcode44(digits)) {
-          toast.error('Leitura inválida (código de barras). Tente novamente.');
-          setIsScanning(false);
-          return;
-        }
-      }
-
-      if (source === 'live') {
-        const now = Date.now();
-        const last = lastCandidateRef.current;
-        if (!last || last.value !== digits || now - last.ts > 2000) {
-          lastCandidateRef.current = { value: digits, count: 1, ts: now };
-          toast.message('Aproxime e mantenha estável para confirmar a leitura...');
-          setIsScanning(false);
-          return;
-        }
-        lastCandidateRef.current = { value: digits, count: last.count + 1, ts: now };
-        if (last.count + 1 < 2) {
-          setIsScanning(false);
-          return;
-        }
-      }
-
-      lastCandidateRef.current = null;
-      stopLive();
-      setIsScanning(true);
-      console.log('Código de barras detectado:', barcodeData);
-      
-      // Vibração se disponível
-      if (navigator.vibrate) {
-        navigator.vibrate(200);
-      }
-      
-      // Feedback visual de sucesso
-      toast.success('Código de barras lido com sucesso!');
-      
-      try {
-        // Desativar o scanner após leitura bem-sucedida com delay
-        scannerTimeoutRef.current = setTimeout(() => {
-          if (digits.length === 44 && digits[0] !== '8') {
-            const linha = barcode44ToLinhaDigitavel47(digits);
-            onBarcodeDetected(linha || digits);
-            setIsScanning(false);
-            return;
-          }
-          onBarcodeDetected(digits);
-          setIsScanning(false);
-        }, 1000);
-        
-        // Limpar qualquer erro anterior
-        setScannerErro(null);
-        
-      } catch (error) {
-        console.error('Erro ao processar código de barras:', error);
-        setScannerErro('Erro ao processar o código de barras.');
-        setIsScanning(false);
-      }
-    }
-  };
-
-  // Função para lidar com erros do scanner
   const handleScannerError = (error: any) => {
     console.error('Erro no scanner:', error);
-    
-    // Ignorar erros normais de detecção de código - isso é comportamento normal
-    if (error.message && (
-      error.message.includes('No MultiFormat Readers were able to detect the code') ||
-      error.message.includes('NotFoundException') ||
-      error.message.includes('No code found') ||
-      error.message.includes('No QR code found')
-    )) {
-      console.log('Erro normal de detecção (ignorado):', error.message);
-      return; // Não tratar como erro
+
+    const msg = String(error?.message || '');
+    if (
+      msg.includes('NotFoundException') ||
+      msg.includes('No MultiFormat Readers were able to detect the code') ||
+      msg.includes('No code found') ||
+      msg.includes('No QR code found')
+    ) {
+      return;
     }
-    
-    // Verificar se o erro está relacionado a permissões
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+
+    if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
       setScannerErro('Permissão da câmera negada. Clique no ícone de câmera na barra de endereço do navegador e permita o acesso.');
-    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+    } else if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
       setScannerErro('Nenhuma câmera encontrada no dispositivo.');
-    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+    } else if (error?.name === 'NotReadableError' || error?.name === 'TrackStartError') {
       setScannerErro('A câmera está em uso por outro aplicativo ou não pode ser acessada.');
-    } else if (error.name === 'OverconstrainedError') {
+    } else if (error?.name === 'OverconstrainedError') {
       setScannerErro('As configurações da câmera solicitadas não são suportadas pelo seu dispositivo.');
-    } else if (error.name === 'TypeError' || error.message?.includes('SSL')) {
+    } else if (error?.name === 'TypeError' || msg.includes('SSL')) {
       setScannerErro('Erro de segurança: O acesso à câmera requer uma conexão segura (HTTPS).');
-    } else if (error.name === 'NotSupportedError' || error.name === 'InsecureContextError') {
+    } else if (error?.name === 'NotSupportedError' || error?.name === 'InsecureContextError') {
       setScannerErro('Scanner não suportado neste navegador ou contexto inseguro.');
     } else {
-      setScannerErro(`Erro ao acessar a câmera: ${error.message || 'Verifique as permissões do navegador e tente novamente'}`);
+      setScannerErro(`Erro ao acessar a câmera: ${msg || 'Verifique as permissões do navegador e tente novamente'}`);
     }
   };
 
-  // Função para alternar entre câmeras
-  const toggleCamera = () => {
-    setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment');
+  const handleBarcodeTextDetected = (barcodeData: string, source: 'live' | 'image') => {
+    if (!barcodeData || isScanning) return;
+
+    const digits = normalizeDigits(barcodeData);
+    if (!digits) return;
+    if (digits.length !== 44 && digits.length !== 47 && digits.length !== 48) return;
+
+    if (digits.length === 47 && !isValidLinhaDigitavel47(digits)) {
+      toast.error('Leitura inválida (boleto). Tente novamente com mais foco/luz.');
+      return;
+    }
+    if (digits.length === 44 && !isValidBarcode44(digits)) {
+      toast.error('Leitura inválida (código de barras). Tente novamente.');
+      return;
+    }
+
+    if (source === 'live') {
+      const now = Date.now();
+      const last = lastCandidateRef.current;
+      if (!last || last.value !== digits || now - last.ts > 2000) {
+        lastCandidateRef.current = { value: digits, count: 1, ts: now };
+        toast.message('Aproxime e mantenha estável para confirmar a leitura...');
+        return;
+      }
+      lastCandidateRef.current = { value: digits, count: last.count + 1, ts: now };
+      if (last.count + 1 < 2) return;
+    }
+
+    lastCandidateRef.current = null;
+    stopScanner();
+    setIsScanning(true);
+
+    if (navigator.vibrate) navigator.vibrate(200);
+    toast.success('Código de barras lido com sucesso!');
+
+    scannerTimeoutRef.current = setTimeout(() => {
+      if (digits.length === 44 && digits[0] !== '8') {
+        const linha = barcode44ToLinhaDigitavel47(digits);
+        onBarcodeDetected(linha || digits);
+        setIsScanning(false);
+        return;
+      }
+      onBarcodeDetected(digits);
+      setIsScanning(false);
+    }, 700);
   };
 
-  const ensureQuagga = async () => {
-    if (quaggaRef.current) return quaggaRef.current;
-    const mod: any = await import('quagga');
-    quaggaRef.current = mod?.default || mod;
-    return quaggaRef.current;
-  };
+  const startScanner = async () => {
+    if (!videoRef.current) return;
 
-  const stopLive = () => {
-    const Quagga = quaggaRef.current;
-    if (!Quagga) return;
-    if (!isLiveRunningRef.current) return;
-    try {
-      Quagga.offDetected();
-    } catch {}
-    try {
-      Quagga.stop();
-    } catch {}
-    isLiveRunningRef.current = false;
-  };
-
-  const startLive = async () => {
-    if (!containerRef.current) return;
-    const Quagga = await ensureQuagga();
-
-    stopLive();
-    containerRef.current.innerHTML = '';
+    stopScanner();
     setScannerErro(null);
 
-    await new Promise<void>((resolve) => {
-      Quagga.init(
-        {
-          inputStream: {
-            name: 'Live',
-            type: 'LiveStream',
-            target: containerRef.current,
-            constraints: {
-              facingMode: cameraFacing,
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
-          locate: true,
-          numOfWorkers: typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency ? Math.min(4, (navigator as any).hardwareConcurrency) : 2,
-          decoder: { readers }
-        },
-        (err: any) => {
-          if (err) {
-            handleScannerError(err);
-            resolve();
-            return;
-          }
-          try {
-            Quagga.onDetected((data: any) => {
-              const code = String(data?.codeResult?.code || '').trim();
-              if (code) handleBarcodeTextDetected(code, 'live');
-            });
-            Quagga.start();
-            isLiveRunningRef.current = true;
-          } catch (e: any) {
-            handleScannerError(e);
-          }
-          resolve();
+    const reader = new BrowserMultiFormatReader(hints, 200);
+    readerRef.current = reader;
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: cameraFacing,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         }
-      );
-    });
+      };
+
+      const controls = await reader.decodeFromConstraints(constraints, videoRef.current, (result, err) => {
+        if (result) {
+          handleBarcodeTextDetected(String(result.getText() || '').trim(), 'live');
+          return;
+        }
+        if (err) handleScannerError(err);
+      });
+
+      stopRef.current = () => {
+        try {
+          controls.stop();
+        } catch {}
+      };
+    } catch (error: any) {
+      handleScannerError(error);
+    }
   };
 
   const decodeFromImageFile = async (file: File) => {
     if (!file) return;
     setIsDecodingImage(true);
     setScannerErro(null);
-
-    await ensureQuagga();
-    stopLive();
+    stopScanner();
 
     const url = URL.createObjectURL(file);
     try {
-      const Quagga = quaggaRef.current;
-      const result = await new Promise<any>((resolve) => {
-        Quagga.decodeSingle(
-          {
-            src: url,
-            locate: true,
-            numOfWorkers: 0,
-            decoder: { readers }
-          },
-          (res: any) => resolve(res)
-        );
+      const img = new window.Image();
+      img.decoding = 'async';
+      img.src = url;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Falha ao carregar a imagem'));
       });
 
-      const code = String(result?.codeResult?.code || '').trim();
-      if (!code) {
-        setScannerErro('Não foi possível ler o código na foto. Tente aproximar mais e melhorar a iluminação.');
-      } else {
-        handleBarcodeTextDetected(code, 'image');
-      }
+      const reader = new BrowserMultiFormatReader(hints, 200);
+      readerRef.current = reader;
+      const result = await reader.decodeFromImageElement(img);
+      handleBarcodeTextDetected(String(result.getText() || '').trim(), 'image');
     } catch (error: any) {
       const msg = String(error?.message || '');
-      setScannerErro(`Erro ao ler foto: ${msg || 'tente novamente'}`);
+      if (msg.includes('NotFoundException') || msg.includes('No MultiFormat Readers were able to detect the code')) {
+        setScannerErro('Não foi possível ler o código na foto. Tente aproximar mais e melhorar a iluminação.');
+      } else {
+        setScannerErro(`Erro ao ler foto: ${msg || 'tente novamente'}`);
+      }
     } finally {
       URL.revokeObjectURL(url);
       setIsDecodingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      if (scannerAtivo) {
-        void startLive();
-      }
+      if (scannerAtivo) void startScanner();
     }
   };
 
   useEffect(() => {
     if (!scannerAtivo) return;
-    setScannerErro(null);
     setIsScanning(false);
-    void startLive();
+    lastCandidateRef.current = null;
+    void startScanner();
     return () => {
-      stopLive();
+      stopScanner();
     };
   }, [scannerAtivo, cameraFacing]);
 
+  const toggleCamera = () => {
+    setCameraFacing(prev => (prev === 'environment' ? 'user' : 'environment'));
+  };
+
   if (!scannerAtivo) return null;
 
-  // Se houver erro, mostrar tela de erro
   if (scannerErro) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999]">
         <div className="bg-white p-6 rounded-lg max-w-md mx-4 text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h3 className="text-lg font-semibold mb-2">Erro no Scanner</h3>
-          <p className="text-gray-600 mb-4">
-            {scannerErro}
-          </p>
+          <p className="text-gray-600 mb-4">{scannerErro}</p>
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => {
                 setScannerErro(null);
+                void startScanner();
               }}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
               Tentar Novamente
             </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
+            <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
               Fechar
             </button>
           </div>
@@ -360,133 +292,141 @@ export function BarcodeScanner({
     );
   }
 
-  // Mostrar scanner diretamente
+  if (scannerPermissaoNegada) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999]">
+        <div className="bg-white p-6 rounded-lg max-w-md mx-4 text-center">
+          <div className="text-red-500 text-6xl mb-4">📷</div>
+          <h3 className="text-lg font-semibold mb-2">Permissão Negada</h3>
+          <p className="text-gray-600 mb-4">
+            Permita o acesso à câmera no navegador para usar o scanner.
+          </p>
+          <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Container da câmera ocupando toda a tela - Layout natural para landscape */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: 9999,
-        backgroundColor: 'black'
-      }}>
-        <div ref={containerRef} className="w-full h-full" />
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          backgroundColor: 'black'
+        }}
+      >
+        <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
       </div>
-          
-          {/* Overlay com guia de posicionamento para landscape */}
-          <div 
-            className="fixed inset-0 flex items-center justify-center pointer-events-none"
+
+      <div
+        className="fixed inset-0 flex items-center justify-center pointer-events-none"
+        style={{
+          width: '100vw',
+          height: '100vh',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 10000
+        }}
+      >
+        <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+
+        <div className="relative flex items-center justify-center">
+          <div
+            className={`relative bg-transparent transition-all duration-300 ${isScanning ? 'animate-pulse' : ''}`}
             style={{
-              width: '100vw',
-              height: '100vh',
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              zIndex: 10000
+              width: '95vw',
+              height: Math.min(window.innerHeight * 0.3, 180),
+              minWidth: '90vw',
+              minHeight: '120px',
+              border: `4px ${isScanning ? 'solid' : 'dashed'} ${isScanning ? '#ef4444' : '#dc2626'}`,
+              borderRadius: '20px',
+              backgroundColor: isScanning ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+              boxShadow: isScanning ? '0 0 30px rgba(239, 68, 68, 0.6)' : 'none'
             }}
           >
-            {/* Área escura ao redor com transparência reduzida */}
-            <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-            
-            {/* Container centralizado para a área de scan - otimizado para landscape */}
-            <div className="relative flex items-center justify-center">
-              {/* Área central transparente com bordas animadas - formato landscape */}
-              <div 
-                className={`relative bg-transparent transition-all duration-300 ${isScanning ? 'animate-pulse' : ''}`}
+            <div
+              className={`absolute -top-2 -left-2 w-8 h-8 border-t-4 border-l-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-tl-xl transition-colors duration-300`}
+            ></div>
+            <div
+              className={`absolute -top-2 -right-2 w-8 h-8 border-t-4 border-r-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-tr-xl transition-colors duration-300`}
+            ></div>
+            <div
+              className={`absolute -bottom-2 -left-2 w-8 h-8 border-b-4 border-l-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-bl-xl transition-colors duration-300`}
+            ></div>
+            <div
+              className={`absolute -bottom-2 -right-2 w-8 h-8 border-b-4 border-r-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-br-xl transition-colors duration-300`}
+            ></div>
+
+            {!isScanning && (
+              <div
+                className="absolute left-0 right-0 h-0.5 bg-red-400 animate-pulse"
                 style={{
-                  width: '95vw', // Ocupar 95% da largura da tela
-                  height: Math.min(window.innerHeight * 0.3, 180), // Altura proporcional para códigos de barras
-                  minWidth: '90vw', // Garantir largura mínima ampla
-                  minHeight: '120px',
-                  border: `4px ${isScanning ? 'solid' : 'dashed'} ${isScanning ? '#ef4444' : '#dc2626'}`,
-                  borderRadius: '20px',
-                  backgroundColor: isScanning ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-                  boxShadow: isScanning ? '0 0 30px rgba(239, 68, 68, 0.6)' : 'none'
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  boxShadow: '0 0 10px rgba(239, 68, 68, 0.8)'
                 }}
-              >
-                {/* Cantos destacados com animação */}
-                <div className={`absolute -top-2 -left-2 w-8 h-8 border-t-4 border-l-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-tl-xl transition-colors duration-300`}></div>
-                <div className={`absolute -top-2 -right-2 w-8 h-8 border-t-4 border-r-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-tr-xl transition-colors duration-300`}></div>
-                <div className={`absolute -bottom-2 -left-2 w-8 h-8 border-b-4 border-l-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-bl-xl transition-colors duration-300`}></div>
-                <div className={`absolute -bottom-2 -right-2 w-8 h-8 border-b-4 border-r-4 ${isScanning ? 'border-red-400' : 'border-red-500'} rounded-br-xl transition-colors duration-300`}></div>
-                
-                {/* Linha de scan animada */}
-                {!isScanning && (
-                  <div 
-                    className="absolute left-0 right-0 h-0.5 bg-red-400 animate-pulse"
-                    style={{
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      boxShadow: '0 0 10px rgba(239, 68, 68, 0.8)'
-                    }}
-                  ></div>
-                )}
-                
-
-              </div>
-            </div>
+              ></div>
+            )}
           </div>
-          
-          {/* Controles do scanner - Layout responsivo para landscape */}
-          <div 
-            className="fixed top-0 left-0 right-0 flex justify-between items-center p-6 pointer-events-auto" 
-            style={{ 
-              zIndex: 10001
-            }}
+        </div>
+      </div>
+
+      <div className="fixed top-0 left-0 right-0 flex justify-between items-center p-6 pointer-events-auto" style={{ zIndex: 10001 }}>
+        <button
+          onClick={toggleCamera}
+          className="bg-black bg-opacity-80 text-white rounded-full p-4 hover:bg-opacity-95 transition-all duration-200 shadow-lg"
+          title={`Alternar para câmera ${cameraFacing === 'environment' ? 'frontal' : 'traseira'}`}
+        >
+          <Camera size={24} />
+        </button>
+
+        <div className="bg-black bg-opacity-80 text-white px-4 py-2 rounded-full text-base font-medium shadow-lg">
+          🔄 Landscape Mode | 📷 {cameraFacing === 'environment' ? 'Traseira' : 'Frontal'}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isDecodingImage}
+            className="bg-blue-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg disabled:opacity-50"
+            title="Ler pela foto"
           >
-            {/* Botão para alternar câmera - Maior para fullscreen */}
-            <button
-              onClick={toggleCamera}
-              className="bg-black bg-opacity-80 text-white rounded-full p-4 hover:bg-opacity-95 transition-all duration-200 shadow-lg"
-              title={`Alternar para câmera ${cameraFacing === 'environment' ? 'frontal' : 'traseira'}`}
-            >
-              <Camera size={24} />
-            </button>
-            
-            {/* Indicador de orientação e status - Mais visível */}
-            <div className="bg-black bg-opacity-80 text-white px-4 py-2 rounded-full text-base font-medium shadow-lg">
-              🔄 Landscape Mode | 📷 {cameraFacing === 'environment' ? 'Traseira' : 'Frontal'}
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isDecodingImage}
-                className="bg-blue-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg disabled:opacity-50"
-                title="Ler pela foto"
-              >
-                <Image size={24} />
-              </button>
-
-              <button
-                onClick={() => {
-                  onClose();
-                  setIsScanning(false);
-                }}
-                className="bg-red-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg"
-                title="Fechar scanner"
-              >
-                <X size={24} />
-              </button>
-            </div>
-          </div>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void decodeFromImageFile(file);
+            <Image size={24} />
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              setIsScanning(false);
             }}
-          />
+            className="bg-red-600 bg-opacity-90 text-white rounded-full p-4 hover:bg-opacity-100 transition-all duration-200 shadow-lg"
+            title="Fechar scanner"
+          >
+            <X size={24} />
+          </button>
+        </div>
+      </div>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void decodeFromImageFile(file);
+        }}
+      />
     </>
   );
 }
+
