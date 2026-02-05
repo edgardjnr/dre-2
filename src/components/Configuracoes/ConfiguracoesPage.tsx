@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CollaboratorsService } from '../../services/collaboratorsService';
 import type { CompanyCollaborator, CollaboratorRole } from '../../types/collaborators';
 import { Spinner } from '../ui/Spinner';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabaseClient';
 
 
@@ -32,6 +33,8 @@ export const ConfiguracoesPage: React.FC = () => {
   const [novaSubPrincipalId, setNovaSubPrincipalId] = useState('');
   const [novaSubNome, setNovaSubNome] = useState('');
   const [categoriasError, setCategoriasError] = useState<string | null>(null);
+  const [deleteCategoriaOpen, setDeleteCategoriaOpen] = useState(false);
+  const [deleteCategoria, setDeleteCategoria] = useState<DreCategoriaRow | null>(null);
 
   useEffect(() => {
     fetchEmpresas();
@@ -230,14 +233,21 @@ export const ConfiguracoesPage: React.FC = () => {
     }
   };
 
+  const requestDeleteCategoria = (categoriaId: string) => {
+    const categoria = dreCategorias.find((r) => r.id === categoriaId) || null;
+    setDeleteCategoria(categoria);
+    setDeleteCategoriaOpen(true);
+  };
+
   const handleDeleteCategoria = async (categoriaId: string) => {
-    if (!window.confirm('Deseja excluir esta categoria? A exclusão só é permitida se não houver contas vinculadas.')) return;
     try {
       setLoadingCategorias(true);
       setCategoriasError(null);
       const { error } = await supabase.rpc('delete_dre_categoria', { p_categoria_id: categoriaId });
       if (error) throw error;
       await fetchDreCategorias();
+      setDeleteCategoriaOpen(false);
+      setDeleteCategoria(null);
     } catch (error: any) {
       setCategoriasError(error?.message || 'Erro ao excluir categoria');
     } finally {
@@ -559,7 +569,8 @@ export const ConfiguracoesPage: React.FC = () => {
                             <div className="flex items-center justify-between">
                               <div className="font-medium text-gray-900">{`${p.codigo}. ${p.nome}`}</div>
                               <button
-                                onClick={() => handleDeleteCategoria(p.id)}
+                                type="button"
+                                onClick={() => requestDeleteCategoria(p.id)}
                                 className="text-red-600 hover:text-red-800 p-1"
                                 disabled={loadingCategorias}
                                 title="Excluir"
@@ -573,7 +584,8 @@ export const ConfiguracoesPage: React.FC = () => {
                                   <div key={s.id} className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2">
                                     <div className="text-sm text-gray-800">{`${s.codigo} ${s.nome}`}</div>
                                     <button
-                                      onClick={() => handleDeleteCategoria(s.id)}
+                                      type="button"
+                                      onClick={() => requestDeleteCategoria(s.id)}
                                       className="text-red-600 hover:text-red-800 p-1"
                                       disabled={loadingCategorias}
                                       title="Excluir"
@@ -640,6 +652,32 @@ export const ConfiguracoesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteCategoriaOpen}
+        onClose={() => {
+          setDeleteCategoriaOpen(false);
+          setDeleteCategoria(null);
+        }}
+        onConfirm={() => {
+          if (deleteCategoria?.id) {
+            void handleDeleteCategoria(deleteCategoria.id);
+            return;
+          }
+          setDeleteCategoriaOpen(false);
+          setDeleteCategoria(null);
+        }}
+        title="Confirmar exclusão"
+        message={
+          deleteCategoria
+            ? `Deseja excluir ${deleteCategoria.parent_id ? 'esta subcategoria' : 'esta categoria'}?\n\n${deleteCategoria.codigo}${deleteCategoria.parent_id ? '' : '.'} ${deleteCategoria.nome}\n\nA exclusão só é permitida se não houver contas vinculadas.`
+            : 'Deseja excluir esta categoria? A exclusão só é permitida se não houver contas vinculadas.'
+        }
+        type="danger"
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        loading={loadingCategorias}
+      />
 
       {/* Removido link de último convite */}
     </div>
