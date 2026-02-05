@@ -3,6 +3,7 @@ import { Camera, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { barcode44ToLinhaDigitavel47, isValidBarcode44, isValidLinhaDigitavel47, normalizeDigits } from '../../utils/boletoUtils';
 
 interface BarcodeScannerProps {
   scannerAtivo: boolean;
@@ -23,6 +24,7 @@ export function BarcodeScanner({
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
+  const lastCandidateRef = useRef<{ value: string; count: number; ts: number } | null>(null);
   
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -101,6 +103,35 @@ export function BarcodeScanner({
   // Função para processar o código de barras lido
   const handleBarcodeTextDetected = (barcodeData: string) => {
     if (barcodeData && !isScanning) {
+      const digits = normalizeDigits(barcodeData);
+      if (digits.length === 47) {
+        if (!isValidLinhaDigitavel47(digits)) {
+          toast.error('Leitura inválida (boleto). Tente novamente com mais foco/luz.');
+          setIsScanning(false);
+          return;
+        }
+      } else if (digits.length === 44) {
+        if (!isValidBarcode44(digits)) {
+          toast.error('Leitura inválida (código de barras). Tente novamente.');
+          setIsScanning(false);
+          return;
+        }
+      } else if (digits.length === 48) {
+        const now = Date.now();
+        const last = lastCandidateRef.current;
+        if (!last || last.value !== digits || now - last.ts > 3000) {
+          lastCandidateRef.current = { value: digits, count: 1, ts: now };
+          toast.message('Aproxime e mantenha estável para confirmar a leitura...');
+          setIsScanning(false);
+          return;
+        }
+        lastCandidateRef.current = { value: digits, count: last.count + 1, ts: now };
+        if (last.count + 1 < 2) {
+          setIsScanning(false);
+          return;
+        }
+      }
+
       setIsScanning(true);
       console.log('Código de barras detectado:', barcodeData);
       
@@ -115,7 +146,14 @@ export function BarcodeScanner({
       try {
         // Desativar o scanner após leitura bem-sucedida com delay
         scannerTimeoutRef.current = setTimeout(() => {
-          onBarcodeDetected(barcodeData);
+          const digits = normalizeDigits(barcodeData);
+          if (digits.length === 44 && digits[0] !== '8') {
+            const linha = barcode44ToLinhaDigitavel47(digits);
+            onBarcodeDetected(linha || digits);
+            setIsScanning(false);
+            return;
+          }
+          onBarcodeDetected(digits || barcodeData);
           setIsScanning(false);
         }, 1000);
         

@@ -9,6 +9,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { applyDateMask, isValidDate, convertToISODate, convertFromISODate, formatDateForDatabase } from '../../utils/dateUtils';
 import { DatePicker } from '../ui/DatePicker';
 import { ImageModal } from './components/ImageModal';
+import { barcode44ToLinhaDigitavel47, isValidBarcode44, isValidLinhaDigitavel47, normalizeDigits } from '../../utils/boletoUtils';
 
 interface ContaPagarFormProps {
   conta?: ContaPagar;
@@ -45,9 +46,18 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   // Listener para receber dados do scanner
   useEffect(() => {
     const handleBarcodeDetected = (event: CustomEvent) => {
-      const codigo = event.detail;
-      setFormData(prev => ({ ...prev, numeroDocumento: codigo }));
-      const novoTipo = detectarTipoDocumento(codigo);
+      const codigo = String(event.detail || '');
+      const digits = normalizeDigits(codigo);
+      let finalValue = digits || codigo;
+      if (digits.length === 44 && digits[0] !== '8' && isValidBarcode44(digits)) {
+        const linha = barcode44ToLinhaDigitavel47(digits);
+        finalValue = linha || digits;
+      } else if (digits.length === 47 && isValidLinhaDigitavel47(digits)) {
+        finalValue = digits;
+      }
+
+      setFormData(prev => ({ ...prev, numeroDocumento: finalValue }));
+      const novoTipo = detectarTipoDocumento(finalValue);
       setTipoDocumento(novoTipo);
     };
     
@@ -1082,9 +1092,10 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 value={formData.numeroDocumento || ''}
                 onChange={(e) => {
                   const novoValor = e.target.value;
-                  setFormData(prev => ({ ...prev, numeroDocumento: novoValor }));
-                  const novoTipo = detectarTipoDocumento(novoValor);
-                  setTipoDocumento(novoTipo);
+                  const digits = normalizeDigits(novoValor);
+                  const finalValue = digits ? digits : novoValor;
+                  setFormData(prev => ({ ...prev, numeroDocumento: finalValue }));
+                  setTipoDocumento(detectarTipoDocumento(finalValue));
                 }}
                 className="flex-1 min-w-0 px-4 py-3 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base truncate"
                 placeholder="Digite ou escaneie o código"
