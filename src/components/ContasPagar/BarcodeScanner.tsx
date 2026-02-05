@@ -90,9 +90,19 @@ export function BarcodeScanner({
   }, []);
 
   // Função para processar o código de barras lido
-  const handleBarcodeTextDetected = (barcodeData: string) => {
+  const handleBarcodeTextDetected = (barcodeData: string, source: 'live' | 'image' = 'live') => {
     if (barcodeData && !isScanning) {
       const digits = normalizeDigits(barcodeData);
+      if (!digits) {
+        setIsScanning(false);
+        return;
+      }
+
+      if (digits.length !== 44 && digits.length !== 47 && digits.length !== 48) {
+        setIsScanning(false);
+        return;
+      }
+
       if (digits.length === 47) {
         if (!isValidLinhaDigitavel47(digits)) {
           toast.error('Leitura inválida (boleto). Tente novamente com mais foco/luz.');
@@ -105,10 +115,12 @@ export function BarcodeScanner({
           setIsScanning(false);
           return;
         }
-      } else if (digits.length === 48) {
+      }
+
+      if (source === 'live') {
         const now = Date.now();
         const last = lastCandidateRef.current;
-        if (!last || last.value !== digits || now - last.ts > 3000) {
+        if (!last || last.value !== digits || now - last.ts > 2000) {
           lastCandidateRef.current = { value: digits, count: 1, ts: now };
           toast.message('Aproxime e mantenha estável para confirmar a leitura...');
           setIsScanning(false);
@@ -121,6 +133,8 @@ export function BarcodeScanner({
         }
       }
 
+      lastCandidateRef.current = null;
+      stopLive();
       setIsScanning(true);
       console.log('Código de barras detectado:', barcodeData);
       
@@ -135,14 +149,13 @@ export function BarcodeScanner({
       try {
         // Desativar o scanner após leitura bem-sucedida com delay
         scannerTimeoutRef.current = setTimeout(() => {
-          const digits = normalizeDigits(barcodeData);
           if (digits.length === 44 && digits[0] !== '8') {
             const linha = barcode44ToLinhaDigitavel47(digits);
             onBarcodeDetected(linha || digits);
             setIsScanning(false);
             return;
           }
-          onBarcodeDetected(digits || barcodeData);
+          onBarcodeDetected(digits);
           setIsScanning(false);
         }, 1000);
         
@@ -249,7 +262,7 @@ export function BarcodeScanner({
           try {
             Quagga.onDetected((data: any) => {
               const code = String(data?.codeResult?.code || '').trim();
-              if (code) handleBarcodeTextDetected(code);
+              if (code) handleBarcodeTextDetected(code, 'live');
             });
             Quagga.start();
             isLiveRunningRef.current = true;
@@ -289,7 +302,7 @@ export function BarcodeScanner({
       if (!code) {
         setScannerErro('Não foi possível ler o código na foto. Tente aproximar mais e melhorar a iluminação.');
       } else {
-        handleBarcodeTextDetected(code);
+        handleBarcodeTextDetected(code, 'image');
       }
     } catch (error: any) {
       const msg = String(error?.message || '');
