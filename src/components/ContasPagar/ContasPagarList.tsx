@@ -977,19 +977,6 @@ export const ContasPagarList: React.FC = () => {
               <Plus className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Nova Conta</span>
             </button>
-            <button 
-              onClick={() => {
-                setScannerAtivo(true);
-                setScannerError(null);
-                setScannerPermissaoNegada(false);
-              }} 
-              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center touch-manipulation text-sm flex-shrink-0"
-              title="Escanear código de barras"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h-4.01M12 12v4m6-4h.01M12 8h.01M12 8h4.01M12 8h-4.01" />
-              </svg>
-            </button>
           </div>
         </div>
       </div>

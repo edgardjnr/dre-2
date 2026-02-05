@@ -2,10 +2,8 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { ContaContabil, Empresa, ContaCategoria } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { Sparkles, HelpCircle, X } from 'lucide-react';
+import { Sparkles, HelpCircle } from 'lucide-react';
 import { DicasRapidas } from './DicasRapidas';
-import { CategoriasGuide } from './CategoriasGuide';
-import { Modal } from '../ui/Modal';
 
 interface ContaFormProps {
   conta?: ContaContabil | null;
@@ -212,7 +210,6 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
   const [codigoFoiEditado, setCodigoFoiEditado] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     const empresaId = formData.empresaId;
@@ -471,14 +468,6 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="block text-sm font-medium text-gray-700">Categoria DRE</label>
-          <button
-            type="button"
-            onClick={() => setShowGuide(true)}
-            className="text-green-600 hover:text-green-700 flex items-center space-x-1 text-sm font-medium transition-colors"
-          >
-            <HelpCircle className="h-4 w-4" />
-            <span>Guia das Categorias</span>
-          </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -575,24 +564,6 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
           {loading ? 'Salvando...' : 'Salvar Conta'}
         </button>
       </div>
-
-      {/* Modal do Guia de Categorias */}
-      <Modal 
-        isOpen={showGuide} 
-        onClose={() => setShowGuide(false)} 
-        title="" 
-        size="full"
-      >
-        <div className="relative">
-          <button
-            onClick={() => setShowGuide(false)}
-            className="absolute top-0 right-0 p-2 text-gray-400 hover:text-gray-600 touch-manipulation"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <CategoriasGuide />
-        </div>
-      </Modal>
     </form>
   );
 };
