@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { ContaContabil, Empresa, ContaCategoria } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
@@ -168,12 +168,41 @@ const categorias: ContaCategoria[] = [
 export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, onSave, onClose }) => {
   const { user } = useAuth();
 
+  type DreCategoriaRow = { id: string; parent_id: string | null; codigo: string; nome: string };
+  type DreCategoriasMode = 'config' | 'legacy';
+  const [dreCategoriasConfig, setDreCategoriasConfig] = useState<DreCategoriaRow[]>([]);
+  const [dreCategoriasMode, setDreCategoriasMode] = useState<DreCategoriasMode>('legacy');
+  const initCategoriaFromConfigRef = useRef(false);
+
+  const principalLabel = (codigo: string, nome: string) => `${codigo}. ${nome}`;
+  const subLabel = (codigo: string, nome: string) => `${codigo} ${nome}`;
+
+  const principaisConfig = useMemo(() => {
+    return dreCategoriasConfig
+      .filter((r) => r.parent_id === null)
+      .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  }, [dreCategoriasConfig]);
+
+  const subsByPrincipalId = useMemo(() => {
+    const map = new Map<string, DreCategoriaRow[]>();
+    for (const r of dreCategoriasConfig) {
+      if (!r.parent_id) continue;
+      const list = map.get(r.parent_id) || [];
+      list.push(r);
+      map.set(r.parent_id, list);
+    }
+    for (const [key, list] of map.entries()) {
+      list.sort((a, b) => a.codigo.localeCompare(b.codigo));
+      map.set(key, list);
+    }
+    return map;
+  }, [dreCategoriasConfig]);
+
   const getInitialState = () => ({
     empresaId: empresas.length > 0 ? empresas[0].id : '',
     codigo: '',
     nome: '',
     categoria: '1. Receita Bruta' as ContaCategoria,
-    subcategoria: '',
     tipo: 'Analítica' as 'Analítica' | 'Sintética',
     ativa: true,
   });
@@ -186,20 +215,58 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
+    const empresaId = formData.empresaId;
+    if (!empresaId) {
+      setDreCategoriasConfig([]);
+      setDreCategoriasMode('legacy');
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      const { data, error } = await supabase
+        .from('dre_categorias_dre')
+        .select('id, parent_id, codigo, nome')
+        .eq('empresa_id', empresaId)
+        .order('codigo', { ascending: true });
+
+      if (cancelled) return;
+
+      if (error) {
+        setDreCategoriasConfig([]);
+        const msg = String(error.message || '');
+        if (/does not exist/i.test(msg) || /42P01/i.test(msg)) {
+          setDreCategoriasMode('legacy');
+        } else {
+          setDreCategoriasMode('config');
+        }
+        return;
+      }
+
+      setDreCategoriasMode('config');
+      setDreCategoriasConfig((data || []) as DreCategoriaRow[]);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.empresaId]);
+
+  useEffect(() => {
     if (conta) {
       setFormData({
         empresaId: conta.empresaId || '',
         codigo: conta.codigo || '',
         nome: conta.nome || '',
         categoria: conta.categoria || '1. Receita Bruta',
-        subcategoria: conta.subcategoria || '',
         tipo: conta.tipo || 'Analítica',
         ativa: conta.ativa ?? true,
       });
       setCodigoFoiEditado(true);
       const gnum = String(conta.categoria || '').match(/^\s*(\d+)/)?.[1];
       if (gnum) {
-        const grp = categoriasTop.find(c => c.startsWith(gnum + '.')) || '1. Receita Bruta';
+        const grp = (hasDreCategoriasConfig ? principaisConfig.map((p) => principalLabel(p.codigo, p.nome)) : categoriasTop).find(c => c.startsWith(gnum + '.')) || '1. Receita Bruta';
         setCategoriaGrupo(grp);
       }
     } else {
@@ -207,6 +274,7 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
       setFormData(initialState);
       setCategoriaGrupo('1. Receita Bruta');
       setCodigoFoiEditado(false);
+      initCategoriaFromConfigRef.current = false;
       
       // Gerar código automaticamente para nova conta
       if (initialState.empresaId && initialState.categoria) {
@@ -216,6 +284,28 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
       }
     }
   }, [conta, empresas, contas]);
+
+  useEffect(() => {
+    if (conta) return;
+    if (dreCategoriasMode !== 'config') return;
+    if (!formData.empresaId) return;
+    if (initCategoriaFromConfigRef.current) return;
+
+    const principais = principaisConfig.map((p) => principalLabel(p.codigo, p.nome));
+    if (principais.length === 0) {
+      setCategoriaGrupo('');
+      setFormData((prev) => ({ ...prev, categoria: '' as ContaCategoria }));
+      initCategoriaFromConfigRef.current = true;
+      return;
+    }
+
+    const grp = principais[0];
+    const subs = getSubcategoriasForGrupo(grp);
+    const primeira = subs[0] || grp;
+    setCategoriaGrupo(grp);
+    setFormData((prev) => ({ ...prev, categoria: primeira }));
+    initCategoriaFromConfigRef.current = true;
+  }, [conta, dreCategoriasMode, principaisConfig, formData.empresaId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -285,6 +375,12 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
 
   const getSubcategoriasForGrupo = (grupo: string): string[] => {
     const gnum = String(grupo).match(/^\s*(\d+)/)?.[1] || '';
+    if (dreCategoriasMode === 'config') {
+      const principal = principaisConfig.find((p) => p.codigo === gnum);
+      if (!principal) return [];
+      const subs = subsByPrincipalId.get(principal.id) || [];
+      return subs.map((s) => subLabel(s.codigo, s.nome));
+    }
     const prefix = gnum ? gnum + '.' : '';
     return categorias.filter(c => c.startsWith(prefix) && c !== grupo);
   };
@@ -326,6 +422,10 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
         setError('Por favor, selecione uma empresa.');
         return;
     }
+    if (dreCategoriasMode === 'config' && principaisConfig.length === 0) {
+      setError('Cadastre as Categorias DRE em Configurações antes de criar contas.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -335,7 +435,7 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
       codigo: formData.codigo,
       nome: formData.nome,
       categoria: formData.categoria,
-      subcategoria: formData.subcategoria || null,
+      subcategoria: conta?.subcategoria || null,
       tipo: formData.tipo,
       ativa: formData.ativa,
     };
@@ -383,16 +483,23 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600">Categoria Principal</label>
-            <select value={categoriaGrupo} onChange={handleCategoriaGrupoChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-              {categoriasTop.map(cat => (
+            <select value={categoriaGrupo} onChange={handleCategoriaGrupoChange} disabled={dreCategoriasMode === 'config' && principaisConfig.length === 0} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500">
+              {(dreCategoriasMode === 'config'
+                ? (principaisConfig.length > 0 ? principaisConfig.map((p) => principalLabel(p.codigo, p.nome)) : ['Nenhuma categoria cadastrada'])
+                : categoriasTop
+              ).map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600">Subcategoria</label>
-            <select name="categoria" value={formData.categoria} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-              {getSubcategoriasForGrupo(categoriaGrupo).map(cat => (
+            <select name="categoria" value={formData.categoria} onChange={handleChange} required disabled={dreCategoriasMode === 'config' && principaisConfig.length === 0} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500">
+              {(
+                dreCategoriasMode === 'config' && principaisConfig.length === 0
+                  ? ['Cadastre categorias em Configurações']
+                  : (getSubcategoriasForGrupo(categoriaGrupo).length > 0 ? getSubcategoriasForGrupo(categoriaGrupo) : [categoriaGrupo])
+              ).map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
@@ -431,11 +538,6 @@ export const ContaForm: React.FC<ContaFormProps> = ({ conta, empresas, contas, o
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Subcategoria (Opcional)</label>
-        <input type="text" name="subcategoria" value={formData.subcategoria || ''} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-      </div>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="relative group">
           <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">Tipo da Conta

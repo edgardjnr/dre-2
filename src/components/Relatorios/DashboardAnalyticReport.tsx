@@ -48,6 +48,7 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [currentDRE, setCurrentDRE] = useState<DREPeriodo | null>(null);
   const [previousDRE, setPreviousDRE] = useState<DREPeriodo | null>(null);
+  const [hasLancamentos, setHasLancamentos] = useState(false);
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -92,17 +93,22 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
       const currentYear = new Date();
       const currentStart = startOfYear(currentYear);
       const currentEnd = endOfYear(currentYear);
+      const currentStartStr = format(currentStart, 'yyyy-MM-dd');
+      const currentEndStr = format(currentEnd, 'yyyy-MM-dd');
       
       const previousYear = new Date(currentYear.getFullYear() - 1, 0, 1);
       const previousStart = startOfYear(previousYear);
       const previousEnd = endOfYear(previousYear);
 
+      const hasData = lancamentos.some((l) => l.empresaId === empresaId && l.data >= currentStartStr && l.data <= currentEndStr);
+      setHasLancamentos(hasData);
+
       const current = DREService.calcularDRE(
         lancamentos,
         contas,
         empresaId,
-        format(currentStart, 'yyyy-MM-dd'),
-        format(currentEnd, 'yyyy-MM-dd')
+        currentStartStr,
+        currentEndStr
       );
 
       const previous = DREService.calcularDRE(
@@ -116,17 +122,20 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
       setCurrentDRE(current);
       setPreviousDRE(previous);
 
-      // Generate KPIs
-      const kpis = generateKPIs(current, previous);
-      setKpiData(kpis);
+      if (hasData) {
+        const kpis = generateKPIs(current, previous);
+        setKpiData(kpis);
 
-      // Generate benchmark data
-      const benchmarks = generateBenchmarkData(current);
-      setBenchmarkData(benchmarks);
+        const benchmarks = generateBenchmarkData(current);
+        setBenchmarkData(benchmarks);
 
-      // Generate trend data
-      const trends = generateTrendData(lancamentos, contas);
-      setTrendData(trends);
+        const trends = generateTrendData(lancamentos, contas);
+        setTrendData(trends);
+      } else {
+        setKpiData([]);
+        setBenchmarkData([]);
+        setTrendData([]);
+      }
 
     } catch (error) {
       console.error('Erro ao carregar dados de analytics:', error);
@@ -306,6 +315,35 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
   const formatNumber = (value: number, decimals: number = 1) => value.toFixed(decimals);
 
+  const clampScore = (value: number) => Math.max(0, Math.min(100, value));
+
+  const performanceScores = React.useMemo(() => {
+    if (!currentDRE || !previousDRE || !hasLancamentos) {
+      return {
+        overall: 0,
+        rentabilidade: 0,
+        liquidez: 0,
+        eficiencia: 0,
+        crescimento: 0
+      };
+    }
+
+    const rentabilidade = clampScore((currentDRE.margemLiquida / 12.8) * 100);
+    const liquidez = clampScore((currentDRE.margemOperacional / 18.3) * 100);
+    const eficiencia =
+      currentDRE.receitaLiquida > 0
+        ? clampScore((1 - currentDRE.despesasOperacionais / currentDRE.receitaLiquida) * 100)
+        : 0;
+    const crescimento =
+      previousDRE.receitaLiquida > 0
+        ? clampScore(((currentDRE.receitaLiquida - previousDRE.receitaLiquida) / previousDRE.receitaLiquida) * 50 + 50)
+        : 0;
+
+    const overall = clampScore((rentabilidade + liquidez + eficiencia + crescimento) / 4);
+
+    return { overall, rentabilidade, liquidez, eficiencia, crescimento };
+  }, [currentDRE, previousDRE, hasLancamentos]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'excellent': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
@@ -362,7 +400,13 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
       {/* KPI Dashboard */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Indicadores Chave de Performance (KPIs)</h3>
-        
+
+        {!hasLancamentos && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md text-sm">
+            Sem lançamentos no período atual. Cadastre lançamentos para gerar os indicadores.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6 min-w-[640px] lg:min-w-0">
           {kpiData.map((kpi, index) => {
@@ -413,6 +457,11 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
         
         <div className="overflow-x-auto">
           <div className="h-64 sm:h-80 min-w-[600px]">
+          {trendData.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-sm text-gray-600">
+              Sem dados suficientes para exibir a evolução.
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={trendData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -436,6 +485,7 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
               <Line yAxisId="ratio" type="monotone" dataKey="liquidezCorrente" stroke="#8b5cf6" strokeWidth={2} name="Liquidez Corrente" />
             </ComposedChart>
           </ResponsiveContainer>
+          )}
           </div>
         </div>
       </div>
@@ -447,6 +497,11 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
           
           <div className="overflow-x-auto">
             <div className="h-64 sm:h-80 min-w-[400px]">
+            {benchmarkData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-gray-600">
+                Sem dados para comparar com benchmarks.
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={benchmarkData} margin={{ top: 20, right: 10, left: 10, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -468,6 +523,7 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
                 <Bar dataKey="mercado" fill="#f59e0b" name="Média do Mercado" />
               </ComposedChart>
             </ResponsiveContainer>
+            )}
             </div>
           </div>
         </div>
@@ -484,7 +540,7 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
                   <div className="w-32 h-32">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadialBarChart cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" data={[
-                        { name: 'Score', value: 75, fill: '#3b82f6' }
+                        { name: 'Score', value: performanceScores.overall, fill: '#3b82f6' }
                       ]}>
                         <RadialBar dataKey="value" cornerRadius={10} />
                       </RadialBarChart>
@@ -492,7 +548,7 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
                   </div>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">75</p>
+                  <p className="text-2xl font-bold text-blue-600">{Math.round(performanceScores.overall)}</p>
                   <p className="text-xs text-gray-600">Score Geral</p>
                 </div>
               </div>
@@ -501,10 +557,10 @@ export const DashboardAnalyticReport: React.FC<DashboardAnalyticReportProps> = (
             {/* Individual Scores */}
             <div className="space-y-3">
               {[
-                { name: 'Rentabilidade', score: 82, color: 'bg-green-500' },
-                { name: 'Liquidez', score: 71, color: 'bg-blue-500' },
-                { name: 'Eficiência', score: 68, color: 'bg-yellow-500' },
-                { name: 'Crescimento', score: 79, color: 'bg-purple-500' }
+                { name: 'Rentabilidade', score: Math.round(performanceScores.rentabilidade), color: 'bg-green-500' },
+                { name: 'Liquidez', score: Math.round(performanceScores.liquidez), color: 'bg-blue-500' },
+                { name: 'Eficiência', score: Math.round(performanceScores.eficiencia), color: 'bg-yellow-500' },
+                { name: 'Crescimento', score: Math.round(performanceScores.crescimento), color: 'bg-purple-500' }
               ].map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">{item.name}</span>
