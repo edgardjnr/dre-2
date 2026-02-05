@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Camera, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { BrowserMultiFormatReader } from '@zxing/browser';
-import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { barcode44ToLinhaDigitavel47, isValidBarcode44, isValidLinhaDigitavel47, normalizeDigits } from '../../utils/boletoUtils';
 
 interface BarcodeScannerProps {
@@ -27,26 +25,15 @@ export function BarcodeScanner({
   const lastCandidateRef = useRef<{ value: string; count: number; ts: number } | null>(null);
   
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const stopRef = useRef<(() => void) | null>(null);
+  const quaggaRef = useRef<any>(null);
+  const isLiveRunningRef = useRef(false);
 
-  const hints = useMemo(() => {
-    const map = new Map();
-    map.set(DecodeHintType.TRY_HARDER, true);
-    map.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.ITF,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-      BarcodeFormat.QR_CODE
-    ]);
-    return map;
-  }, []);
+  const readers = useMemo(
+    () => ['i2of5_reader', 'code_128_reader', 'ean_reader', 'ean_8_reader', 'code_39_reader', 'upc_reader', 'upc_e_reader'],
+    []
+  );
 
   // Função para forçar orientação landscape
   const forceOrientationLandscape = async () => {
@@ -93,9 +80,11 @@ export function BarcodeScanner({
       if (scannerTimeoutRef.current) {
         clearTimeout(scannerTimeoutRef.current);
       }
-      if (stopRef.current) {
-        stopRef.current();
-        stopRef.current = null;
+      if (isLiveRunningRef.current && quaggaRef.current) {
+        try {
+          quaggaRef.current.stop();
+        } catch {}
+        isLiveRunningRef.current = false;
       }
     };
   }, []);
@@ -206,96 +195,112 @@ export function BarcodeScanner({
     setCameraFacing(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
+  const ensureQuagga = async () => {
+    if (quaggaRef.current) return quaggaRef.current;
+    const mod: any = await import('quagga');
+    quaggaRef.current = mod?.default || mod;
+    return quaggaRef.current;
+  };
+
+  const stopLive = () => {
+    const Quagga = quaggaRef.current;
+    if (!Quagga) return;
+    if (!isLiveRunningRef.current) return;
+    try {
+      Quagga.offDetected();
+    } catch {}
+    try {
+      Quagga.stop();
+    } catch {}
+    isLiveRunningRef.current = false;
+  };
+
+  const startLive = async () => {
+    if (!containerRef.current) return;
+    const Quagga = await ensureQuagga();
+
+    stopLive();
+    containerRef.current.innerHTML = '';
+    setScannerErro(null);
+
+    await new Promise<void>((resolve) => {
+      Quagga.init(
+        {
+          inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: containerRef.current,
+            constraints: {
+              facingMode: cameraFacing,
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          locate: true,
+          numOfWorkers: typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency ? Math.min(4, (navigator as any).hardwareConcurrency) : 2,
+          decoder: { readers }
+        },
+        (err: any) => {
+          if (err) {
+            handleScannerError(err);
+            resolve();
+            return;
+          }
+          try {
+            Quagga.onDetected((data: any) => {
+              const code = String(data?.codeResult?.code || '').trim();
+              if (code) handleBarcodeTextDetected(code);
+            });
+            Quagga.start();
+            isLiveRunningRef.current = true;
+          } catch (e: any) {
+            handleScannerError(e);
+          }
+          resolve();
+        }
+      );
+    });
+  };
+
   const decodeFromImageFile = async (file: File) => {
     if (!file) return;
     setIsDecodingImage(true);
     setScannerErro(null);
 
-    if (stopRef.current) {
-      stopRef.current();
-      stopRef.current = null;
-    }
+    await ensureQuagga();
+    stopLive();
 
     const url = URL.createObjectURL(file);
     try {
-      const img = new window.Image();
-      img.decoding = 'async';
-      img.src = url;
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Falha ao carregar a imagem'));
+      const Quagga = quaggaRef.current;
+      const result = await new Promise<any>((resolve) => {
+        Quagga.decodeSingle(
+          {
+            src: url,
+            locate: true,
+            numOfWorkers: 0,
+            decoder: { readers }
+          },
+          (res: any) => resolve(res)
+        );
       });
 
-      const reader = new BrowserMultiFormatReader(hints, 200);
-      readerRef.current = reader;
-      const result = await reader.decodeFromImageElement(img);
-      handleBarcodeTextDetected(String(result.getText() || '').trim());
-    } catch (error: any) {
-      const msg = String(error?.message || '');
-      if (msg.includes('NotFoundException') || msg.includes('No MultiFormat Readers were able to detect the code')) {
+      const code = String(result?.codeResult?.code || '').trim();
+      if (!code) {
         setScannerErro('Não foi possível ler o código na foto. Tente aproximar mais e melhorar a iluminação.');
       } else {
-        setScannerErro(`Erro ao ler foto: ${msg || 'tente novamente'}`);
+        handleBarcodeTextDetected(code);
       }
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      setScannerErro(`Erro ao ler foto: ${msg || 'tente novamente'}`);
     } finally {
       URL.revokeObjectURL(url);
       setIsDecodingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (scannerAtivo) {
-        void startScanner();
+        void startLive();
       }
-    }
-  };
-
-  const startScanner = async () => {
-    if (!videoRef.current) return;
-
-    if (stopRef.current) {
-      stopRef.current();
-      stopRef.current = null;
-    }
-
-    const reader = new BrowserMultiFormatReader(hints, 200);
-    readerRef.current = reader;
-
-    try {
-      const constraints: MediaStreamConstraints = {
-        audio: false,
-        video: {
-          facingMode: cameraFacing,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      };
-
-      const controls = await reader.decodeFromConstraints(constraints, videoRef.current, (result, err) => {
-        if (result) {
-          handleBarcodeTextDetected(String(result.getText() || '').trim());
-          return;
-        }
-        if (err) {
-          const msg = String((err as any).message || '');
-          if (
-            msg.includes('NotFoundException') ||
-            msg.includes('No MultiFormat Readers were able to detect the code') ||
-            msg.includes('No code found')
-          ) {
-            return;
-          }
-          handleScannerError(err);
-        }
-      });
-
-      stopRef.current = () => {
-        try {
-          controls.stop();
-        } catch {}
-        try {
-          reader.reset();
-        } catch {}
-      };
-    } catch (error: any) {
-      handleScannerError(error);
     }
   };
 
@@ -303,12 +308,9 @@ export function BarcodeScanner({
     if (!scannerAtivo) return;
     setScannerErro(null);
     setIsScanning(false);
-    void startScanner();
+    void startLive();
     return () => {
-      if (stopRef.current) {
-        stopRef.current();
-        stopRef.current = null;
-      }
+      stopLive();
     };
   }, [scannerAtivo, cameraFacing]);
 
@@ -358,12 +360,7 @@ export function BarcodeScanner({
         zIndex: 9999,
         backgroundColor: 'black'
       }}>
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-        />
+        <div ref={containerRef} className="w-full h-full" />
       </div>
           
           {/* Overlay com guia de posicionamento para landscape */}
