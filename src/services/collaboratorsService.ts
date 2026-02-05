@@ -224,19 +224,27 @@ export class CollaboratorsService {
     }
 
     if (!count || count === 0) {
-      const { data: deleteData, error: deleteError } = await supabase.functions.invoke('delete-auth-user', {
-        body: {
-          userId: collaboratorData.user_id,
-          companyId: collaboratorData.company_id,
-        },
-      });
-
-      if (deleteError) {
-        return { success: false, error: deleteError.message };
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        return { success: false, error: 'Sessão expirada. Faça login novamente.' };
       }
 
-      if (!deleteData?.success) {
-        return { success: false, error: deleteData?.error || 'Falha ao excluir usuário' };
+      const resp = await fetch('/api/delete-auth-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          userId: collaboratorData.user_id,
+          companyId: collaboratorData.company_id,
+        }),
+      });
+
+      const payload = await resp.json().catch(() => null);
+      if (!resp.ok || !payload?.success) {
+        return { success: false, error: payload?.error || 'Falha ao excluir usuário' };
       }
     }
 
