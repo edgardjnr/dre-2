@@ -29,9 +29,6 @@ export const ConfiguracoesPage: React.FC = () => {
 
   const [dreCategorias, setDreCategorias] = useState<DreCategoriaRow[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
-  const [novaPrincipalNome, setNovaPrincipalNome] = useState('');
-  const [novaSubPrincipalId, setNovaSubPrincipalId] = useState('');
-  const [novaSubNome, setNovaSubNome] = useState('');
   const [categoriasError, setCategoriasError] = useState<string | null>(null);
   const [deleteCategoriaOpen, setDeleteCategoriaOpen] = useState(false);
   const [deleteCategoria, setDeleteCategoria] = useState<DreCategoriaRow | null>(null);
@@ -183,10 +180,6 @@ export const ConfiguracoesPage: React.FC = () => {
       if (error) throw error;
       const rows = (data || []) as DreCategoriaRow[];
       setDreCategorias(rows);
-      const principals = rows.filter((r) => r.parent_id === null);
-      if (principals.length > 0 && !novaSubPrincipalId) {
-        setNovaSubPrincipalId(principals[0].id);
-      }
     } catch (error: any) {
       setCategoriasError(error?.message || 'Erro ao carregar categorias');
       setDreCategorias([]);
@@ -196,34 +189,6 @@ export const ConfiguracoesPage: React.FC = () => {
   };
 
   const drePrincipais = useMemo(() => dreCategorias.filter((r) => r.parent_id === null), [dreCategorias]);
-  const proximoCodigoPrincipal = useMemo(() => {
-    const nums = drePrincipais
-      .map((r) => parseInt(String(r.codigo).split('.')[0], 10))
-      .filter((n) => Number.isFinite(n));
-    const max = nums.length > 0 ? Math.max(...nums) : 0;
-    return String(max + 1);
-  }, [drePrincipais]);
-
-  const principalSelecionada = useMemo(() => {
-    return drePrincipais.find((p) => p.id === novaSubPrincipalId) || null;
-  }, [drePrincipais, novaSubPrincipalId]);
-
-  const proximoCodigoSubcategoria = useMemo(() => {
-    if (!principalSelecionada) return '';
-    const prefix = `${principalSelecionada.codigo}.`;
-    const subs = dreCategorias
-      .filter((r) => r.parent_id === principalSelecionada.id && typeof r.codigo === 'string' && r.codigo.startsWith(prefix));
-    const nums = subs
-      .map((r) => {
-        const rest = r.codigo.slice(prefix.length);
-        const first = rest.split('.')[0];
-        const n = parseInt(first, 10);
-        return Number.isFinite(n) ? n : NaN;
-      })
-      .filter((n) => Number.isFinite(n));
-    const max = nums.length > 0 ? Math.max(...nums) : 0;
-    return `${principalSelecionada.codigo}.${max + 1}`;
-  }, [principalSelecionada, dreCategorias]);
 
   const dreSubsByPrincipal = useMemo(() => {
     const map = new Map<string, DreCategoriaRow[]>();
@@ -240,73 +205,6 @@ export const ConfiguracoesPage: React.FC = () => {
     return map;
   }, [dreCategorias]);
 
-  const isCodigoDisponivel = (codigo: string): boolean => {
-    return !dreCategorias.some((r) => r.codigo === codigo);
-  };
-
-  const friendlyCategoriaError = (error: any, fallback: string) => {
-    const msg = error?.message || fallback;
-    if (/duplicate key|unique constraint|violates unique constraint/i.test(msg)) {
-      return 'Esse código já existe. Tente novamente.';
-    }
-    return msg;
-  };
-
-  const handleAddPrincipal = async () => {
-    if (!selectedEmpresa || !proximoCodigoPrincipal || !novaPrincipalNome.trim()) return;
-    try {
-      if (!isCodigoDisponivel(proximoCodigoPrincipal)) {
-        setCategoriasError('Esse código já existe. Tente novamente.');
-        return;
-      }
-      setLoadingCategorias(true);
-      setCategoriasError(null);
-      const { error } = await supabase.from('dre_categorias_dre').insert({
-        empresa_id: selectedEmpresa,
-        parent_id: null,
-        codigo: proximoCodigoPrincipal,
-        nome: novaPrincipalNome.trim(),
-      });
-      if (error) throw error;
-      setNovaPrincipalNome('');
-      await fetchDreCategorias();
-    } catch (error: any) {
-      setCategoriasError(friendlyCategoriaError(error, 'Erro ao criar categoria principal'));
-    } finally {
-      setLoadingCategorias(false);
-    }
-  };
-
-  const handleAddSubcategoria = async () => {
-    if (!selectedEmpresa || !novaSubPrincipalId || !proximoCodigoSubcategoria || !novaSubNome.trim()) return;
-    try {
-      const principal = dreCategorias.find((r) => r.id === novaSubPrincipalId && r.parent_id === null);
-      if (!principal) {
-        setCategoriasError('Selecione uma categoria principal válida');
-        return;
-      }
-      if (!isCodigoDisponivel(proximoCodigoSubcategoria)) {
-        setCategoriasError('Esse código já existe. Tente novamente.');
-        return;
-      }
-
-      setLoadingCategorias(true);
-      setCategoriasError(null);
-      const { error } = await supabase.from('dre_categorias_dre').insert({
-        empresa_id: selectedEmpresa,
-        parent_id: novaSubPrincipalId,
-        codigo: proximoCodigoSubcategoria,
-        nome: novaSubNome.trim(),
-      });
-      if (error) throw error;
-      setNovaSubNome('');
-      await fetchDreCategorias();
-    } catch (error: any) {
-      setCategoriasError(friendlyCategoriaError(error, 'Erro ao criar subcategoria'));
-    } finally {
-      setLoadingCategorias(false);
-    }
-  };
 
   const requestDeleteCategoria = (categoriaId: string) => {
     const categoria = dreCategorias.find((r) => r.id === categoriaId) || null;
@@ -578,59 +476,7 @@ export const ConfiguracoesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Criar Categoria DRE</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Categoria Principal</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Código (automático)</label>
-                        <input value={proximoCodigoPrincipal} readOnly className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700">Nome</label>
-                        <input value={novaPrincipalNome} onChange={(e) => setNovaPrincipalNome(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ex.: Receita Bruta" />
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <button onClick={handleAddPrincipal} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center gap-2" disabled={loadingCategorias}>
-                        <Plus className="h-4 w-4" />
-                        Criar Principal
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Subcategoria</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Categoria Principal</label>
-                        <select value={novaSubPrincipalId} onChange={(e) => setNovaSubPrincipalId(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                          {drePrincipais.map((p) => (
-                            <option key={p.id} value={p.id}>{`${p.codigo}. ${p.nome}`}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">Código (automático)</label>
-                          <input value={proximoCodigoSubcategoria} readOnly className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700">Nome</label>
-                          <input value={novaSubNome} onChange={(e) => setNovaSubNome(e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ex.: Venda de Bebidas" />
-                        </div>
-                      </div>
-                      <div>
-                        <button onClick={handleAddSubcategoria} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center gap-2" disabled={loadingCategorias || drePrincipais.length === 0}>
-                          <Plus className="h-4 w-4" />
-                          Criar Subcategoria
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
