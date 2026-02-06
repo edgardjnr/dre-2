@@ -575,21 +575,36 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const fetchContasContabeis = async (empresaId?: string) => {
     try {
       setLoadingContasContabeis(true);
-      let query = supabase
-        .from('contas_contabeis')
-        .select('id, user_id, created_at, empresa_id, codigo, nome, categoria, subcategoria, tipo, ativa')
-        .eq('ativa', true)
-        .order('codigo');
-
-      if (empresaId) {
-        query = query.eq('empresa_id', empresaId);
+      if (!empresaId) {
+        setContasContabeis([]);
+        return;
       }
 
-      const { data, error } = await query;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        setContasContabeis([]);
+        setError('Sessão expirada. Faça login novamente.');
+        return;
+      }
 
-      if (error) throw error;
+      const resp = await fetch('/api/get-contas-contabeis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ companyId: empresaId })
+      });
+
+      const payload = await resp.json().catch(() => null);
+      if (!resp.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Falha ao carregar contas contábeis');
+      }
+
+      const rows = (payload?.data || []) as any[];
       setContasContabeis(
-        (data || []).map((item: any) => ({
+        rows.map((item: any) => ({
           id: item.id,
           user_id: item.user_id,
           created_at: item.created_at,
