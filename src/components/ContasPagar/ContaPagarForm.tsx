@@ -1078,7 +1078,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           : existingComprovante;
       const previousComprovanteKey = conta?.fotoUrl ? extractStorageKey(conta.fotoUrl) : null;
   
-      const tipoDocumentoBanco = nfeResumo ? 'nfe' : (tipoDocumento === 'pix' ? 'pix' : 'boleto');
+      const tipoDocumentoBanco = tipoDocumento === 'pix' ? 'pix' : 'boleto';
 
       const baseContaData = {
         user_id: currentUser.id,
