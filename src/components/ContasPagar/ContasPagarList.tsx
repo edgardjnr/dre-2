@@ -905,6 +905,52 @@ export const ContasPagarList: React.FC = () => {
     return 0;
   });
 
+  const contasAgrupadas = (() => {
+    const groups = new Map<string, {
+      empresaId: string;
+      fornecedor: string;
+      descricao: string;
+      numeroDocumento?: string;
+      dataVencimento: string;
+      createdAt: string;
+      valorTotal: number;
+      status: ContaPagarStatus;
+      contaContabilId?: string;
+      id: string;
+    }>();
+
+    for (const c of contasFiltradas) {
+      const key = c.numeroDocumento ? `${c.empresaId}|${c.numeroDocumento}` : c.id;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          id: c.id,
+          empresaId: c.empresaId,
+          fornecedor: c.fornecedor,
+          descricao: c.descricao,
+          numeroDocumento: c.numeroDocumento,
+          dataVencimento: c.dataVencimento,
+          createdAt: c.createdAt,
+          valorTotal: c.valor,
+          status: c.status,
+          contaContabilId: c.contaContabilId,
+        });
+      } else {
+        existing.valorTotal += c.valor;
+        // status agregado: se algum pendente, pendente; senão se algum vencida, vencida; senão se todos pagos, paga; senão mantém
+        const order = (s: ContaPagarStatus) => (s === 'pendente' ? 3 : s === 'vencida' ? 2 : s === 'paga' ? 1 : 0);
+        if (order(c.status) > order(existing.status)) {
+          existing.status = c.status;
+        }
+        // vencimento: manter o mais próximo (menor data)
+        if (new Date(c.dataVencimento) < new Date(existing.dataVencimento)) {
+          existing.dataVencimento = c.dataVencimento;
+        }
+      }
+    }
+    return Array.from(groups.values());
+  })();
+
   // Calcular totais
   const totalPendente = contasFiltradas
     .filter(c => c.status === 'pendente')
@@ -1014,7 +1060,7 @@ export const ContasPagarList: React.FC = () => {
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
               <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total de Contas</p>
-              <p className="text-sm sm:text-lg lg:text-xl font-bold text-gray-900 truncate">{contasFiltradas.length}</p>
+              <p className="text-sm sm:text-lg lg:text-xl font-bold text-gray-900 truncate">{contasAgrupadas.length}</p>
             </div>
           </div>
         </div>
@@ -1219,7 +1265,7 @@ export const ContasPagarList: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {contasFiltradas.map((conta, index) => (
+              {contasAgrupadas.map((conta, index) => (
                 <tr key={conta.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="py-3 px-4 max-w-0">
                     <div className="overflow-hidden">
@@ -1252,7 +1298,7 @@ export const ContasPagarList: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <span className="font-medium text-gray-900 text-sm">{formatCurrency(conta.valor)}</span>
+                    <span className="font-medium text-gray-900 text-sm">{formatCurrency(conta.valorTotal)}</span>
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(conta.status, conta.dataVencimento)}`}>
@@ -1304,7 +1350,7 @@ export const ContasPagarList: React.FC = () => {
           >
             <ArrowUpDown className="h-5 w-5" />
           </button>
-          {contasFiltradas.map((conta) => {
+          {contasAgrupadas.map((conta) => {
             const isVencida = conta.status === 'pendente' && isBefore(formatDateForDisplay(conta.dataVencimento), new Date());
             const isProximaVencimento = conta.status === 'pendente' && isAfter(formatDateForDisplay(conta.dataVencimento), new Date()) && isBefore(formatDateForDisplay(conta.dataVencimento), addDays(new Date(), 7));
             
