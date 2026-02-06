@@ -87,21 +87,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const { data: contas, error: contasError } = await admin
-      .from('contas_contabeis')
-      .select('id, user_id, created_at, empresa_id, codigo, nome, categoria, subcategoria, tipo, ativa')
-      .eq('empresa_id', String(companyId))
-      .eq('ativa', true)
-      .order('codigo', { ascending: true })
+    const selectFull = 'id, user_id, created_at, empresa_id, codigo, nome, categoria, subcategoria, tipo, ativa'
+    const selectWithoutSub = 'id, user_id, created_at, empresa_id, codigo, nome, categoria, tipo, ativa'
 
-    if (contasError) {
-      res.status(400).json({ success: false, error: contasError.message })
+    const runQuery = async (select: string) => {
+      return await admin
+        .from('contas_contabeis')
+        .select(select)
+        .eq('empresa_id', String(companyId))
+        .eq('ativa', true)
+        .order('codigo', { ascending: true })
+    }
+
+    let contasRes = await runQuery(selectFull)
+    if (contasRes.error) {
+      const msg = String(contasRes.error.message || '')
+      const missingSub = /subcategoria/i.test(msg) && /does not exist|unknown column|42703/i.test(msg)
+      if (missingSub) {
+        contasRes = await runQuery(selectWithoutSub)
+      }
+    }
+
+    if (contasRes.error) {
+      res.status(400).json({ success: false, error: contasRes.error.message })
       return
     }
 
-    res.status(200).json({ success: true, data: contas || [] })
+    res.status(200).json({ success: true, data: contasRes.data || [] })
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Server error' })
   }
 }
-

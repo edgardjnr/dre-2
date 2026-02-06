@@ -588,35 +588,93 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
         return;
       }
 
-      const resp = await fetch('/api/get-contas-contabeis', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ companyId: empresaId })
-      });
+      const tryLoadViaApi = async (): Promise<any[] | null> => {
+        const resp = await fetch('/api/get-contas-contabeis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ companyId: empresaId })
+        });
 
-      const payload = await resp.json().catch(() => null);
-      if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || 'Falha ao carregar contas contábeis');
+        const text = await resp.text();
+        let payload: any = null;
+        try {
+          payload = JSON.parse(text);
+        } catch {}
+
+        if (!resp.ok || !payload?.success) {
+          const status = resp.status;
+          const isLikelyMissingApi =
+            status === 404 ||
+            status === 405 ||
+            /<!doctype html/i.test(text) ||
+            /Cannot (POST|GET) \/api\//i.test(text);
+
+          if (isLikelyMissingApi) {
+            return null;
+          }
+
+          throw new Error(payload?.error || `Falha ao carregar contas contábeis (HTTP ${status})`);
+        }
+
+        return (payload?.data || []) as any[];
+      };
+
+      const tryLoadViaClient = async (): Promise<any[]> => {
+        const selectFull = 'id, user_id, created_at, empresa_id, codigo, nome, categoria, subcategoria, tipo, ativa';
+        const selectWithoutSub = 'id, user_id, created_at, empresa_id, codigo, nome, categoria, tipo, ativa';
+
+        const run = async (select: string) => {
+          return await supabase
+            .from('contas_contabeis')
+            .select(select)
+            .eq('ativa', true)
+            .eq('empresa_id', empresaId)
+            .order('codigo');
+        };
+
+        let res = await run(selectFull);
+        if (res.error) {
+          const msg = String(res.error.message || '');
+          const missingSub = /subcategoria/i.test(msg) && /does not exist|unknown column|42703/i.test(msg);
+          if (missingSub) {
+            res = await run(selectWithoutSub);
+          }
+        }
+
+        if (res.error) {
+          const msg = String(res.error.message || 'Falha ao carregar contas contábeis');
+          throw new Error(msg);
+        }
+
+        return (res.data || []) as any[];
+      };
+
+      let rows: any[] | null = null;
+      try {
+        rows = await tryLoadViaApi();
+      } catch (e) {
+        throw e;
       }
 
-      const rows = (payload?.data || []) as any[];
-      setContasContabeis(
-        rows.map((item: any) => ({
-          id: item.id,
-          user_id: item.user_id,
-          created_at: item.created_at,
-          empresaId: item.empresa_id,
-          codigo: item.codigo,
-          nome: item.nome,
-          categoria: item.categoria,
-          subcategoria: item.subcategoria ?? null,
-          tipo: item.tipo,
-          ativa: item.ativa
-        }))
-      );
+      if (!rows) {
+        rows = await tryLoadViaClient();
+      }
+
+      setContasContabeis(rows.map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        created_at: item.created_at,
+        empresaId: item.empresa_id,
+        codigo: item.codigo,
+        nome: item.nome,
+        categoria: item.categoria,
+        subcategoria: item.subcategoria ?? null,
+        tipo: item.tipo,
+        ativa: item.ativa
+      })));
       lastLoadedEmpresaIdRef.current = empresaId || null;
     } catch (error) {
       console.error('Erro ao carregar contas contábeis:', error);
