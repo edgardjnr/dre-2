@@ -22,6 +22,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const comprovanteInputRef = useRef<HTMLInputElement>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
+  const lastLoadedEmpresaIdRef = useRef<string | null>(null);
 
   type NFeItem = {
     id: string;
@@ -170,6 +171,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   }, [contasContabeisFiltradas, formData.contaContabilId, selectedCategoriaDre]);
 
   const [loading, setLoading] = useState(false);
+  const [loadingContasContabeis, setLoadingContasContabeis] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -207,10 +209,24 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
 
 
 
-  // useEffect corrigido
   useEffect(() => {
-    fetchEmpresas();
-  }, []);
+    let cancelled = false;
+    const init = async () => {
+      try {
+        const companies = await fetchEmpresas();
+        if (cancelled) return;
+        const defaultEmpresaId = conta?.empresaId || companies?.[0]?.id || '';
+        if (defaultEmpresaId) {
+          setSelectedEmpresaId(defaultEmpresaId);
+          await fetchContasContabeis(defaultEmpresaId);
+        }
+      } catch {}
+    };
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, [conta?.empresaId]);
 
 
   
@@ -538,28 +554,30 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     existingComprovante
   ]);
 
-  const fetchEmpresas = async () => {
+  const fetchEmpresas = async (): Promise<Array<{ id: string; razao_social: string }>> => {
     try {
       const { data, error } = await supabase.rpc('get_user_companies');
 
       if (error) throw error;
-      setEmpresas(
-        (data || []).map((row: any) => ({
-          id: row.id,
-          razao_social: row.razao_social
-        }))
-      );
+      const companies = (data || []).map((row: any) => ({
+        id: row.id,
+        razao_social: row.razao_social
+      }));
+      setEmpresas(companies);
+      return companies;
     } catch (error) {
       console.error('Erro ao carregar empresas:', error);
-      setError('Erro ao carregar empresas');
+      setError((error as any)?.message ? String((error as any).message) : 'Erro ao carregar empresas');
+      return [];
     }
   };
 
   const fetchContasContabeis = async (empresaId?: string) => {
     try {
+      setLoadingContasContabeis(true);
       let query = supabase
         .from('contas_contabeis')
-        .select('id, user_id, created_at, empresa_id, codigo, nome, categoria, tipo, ativa')
+        .select('id, user_id, created_at, empresa_id, codigo, nome, categoria, subcategoria, tipo, ativa')
         .eq('ativa', true)
         .order('codigo');
 
@@ -584,10 +602,13 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           ativa: item.ativa
         }))
       );
+      lastLoadedEmpresaIdRef.current = empresaId || null;
     } catch (error) {
       console.error('Erro ao carregar contas contábeis:', error);
       const msg = (error as any)?.message ? String((error as any).message) : 'Erro ao carregar contas contábeis';
       setError(msg);
+    } finally {
+      setLoadingContasContabeis(false);
     }
   };
 
@@ -602,6 +623,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
 
   useEffect(() => {
     if (!selectedEmpresaId) return;
+    if (lastLoadedEmpresaIdRef.current === selectedEmpresaId) return;
     void fetchContasContabeis(selectedEmpresaId);
   }, [selectedEmpresaId]);
   
@@ -1208,9 +1230,13 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
             <select
               value={selectedEmpresaId}
               onChange={(e) => {
-                setSelectedEmpresaId(e.target.value);
+                const nextEmpresaId = e.target.value;
+                lastLoadedEmpresaIdRef.current = null;
+                setContasContabeis([]);
+                setSelectedEmpresaId(nextEmpresaId);
                 setSelectedCategoriaDre('');
                 setFormData(prev => ({ ...prev, contaContabilId: '' })); // Limpar conta contábil ao trocar empresa
+                if (nextEmpresaId) void fetchContasContabeis(nextEmpresaId);
               }}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
               required
@@ -1524,12 +1550,14 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 setFormData(prev => ({ ...prev, contaContabilId: '' }));
               }}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
-              disabled={!selectedEmpresaId || categoriasDisponiveis.length === 0}
+              disabled={!selectedEmpresaId || loadingContasContabeis || categoriasDisponiveis.length === 0}
             >
               <option value="">
                 {!selectedEmpresaId
                   ? 'Selecione uma empresa primeiro'
-                  : categoriasDisponiveis.length === 0
+                  : loadingContasContabeis
+                    ? 'Carregando categorias...'
+                    : categoriasDisponiveis.length === 0
                     ? 'Nenhuma categoria disponível'
                     : 'Selecione uma categoria'
                 }
@@ -1540,6 +1568,11 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 </option>
               ))}
             </select>
+            {!loadingContasContabeis && selectedEmpresaId && contasContabeisFiltradas.length === 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                Nenhuma conta contábil ativa encontrada para esta empresa.
+              </div>
+            )}
           </div>
 
             <div>
@@ -1551,7 +1584,7 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 value={formData.contaContabilId || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, contaContabilId: e.target.value }))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset focus:ring-offset-1 focus:ring-offset-white text-sm sm:text-base text-ellipsis"
-                disabled={!selectedEmpresaId || !selectedCategoriaDre || contasContabeisPorCategoria.length === 0}
+                disabled={!selectedEmpresaId || loadingContasContabeis || !selectedCategoriaDre || contasContabeisPorCategoria.length === 0}
               >
                 <option value="">Selecione uma conta contábil</option>
                 {contasContabeisPorCategoria.map(conta => (
