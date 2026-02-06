@@ -21,6 +21,28 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const comprovanteInputRef = useRef<HTMLInputElement>(null);
+  const xmlInputRef = useRef<HTMLInputElement>(null);
+
+  type NFeItem = {
+    id: string;
+    descricao: string;
+    quantidade: number;
+    unidade: string;
+    valor: number;
+    contaContabilId: string;
+  };
+
+  type NFeResumo = {
+    chave: string;
+    numero: string;
+    emissaoISO: string;
+    emitNome: string;
+    emitCnpj: string;
+    destNome: string;
+    destCnpj: string;
+    total: number;
+    vencimentoISO: string;
+  };
   
   // Função para garantir que a data seja salva sem conversão de timezone
   const formatDateForDatabase = (dateString: string): string => {
@@ -88,6 +110,12 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   // Estado para empresa selecionada (separado do formData)
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string>('');
   const [selectedCategoriaDre, setSelectedCategoriaDre] = useState<string>('');
+
+  const [nfeResumo, setNfeResumo] = useState<NFeResumo | null>(null);
+  const [nfeItems, setNfeItems] = useState<NFeItem[]>([]);
+  const [splitByItems, setSplitByItems] = useState(false);
+  const [xmlLoading, setXmlLoading] = useState(false);
+  const [xmlError, setXmlError] = useState<string | null>(null);
   
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
@@ -182,7 +210,6 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
   // useEffect corrigido
   useEffect(() => {
     fetchEmpresas();
-    fetchContasContabeis();
   }, []);
 
 
@@ -284,8 +311,134 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       setComprovanteFile(null);
       setComprovantePreview('');
       setComprovanteRemoved(false);
+      setNfeResumo(null);
+      setNfeItems([]);
+      setSplitByItems(false);
+      setXmlError(null);
     }
   }, [conta]);
+
+  const parseNumber = (value: string): number => {
+    const v = String(value || '').trim().replace(',', '.');
+    const n = Number.parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const getTextNS = (parent: Element | null, ns: string, tag: string): string => {
+    if (!parent) return '';
+    const el = parent.getElementsByTagNameNS(ns, tag)?.[0];
+    return String(el?.textContent || '').trim();
+  };
+
+  const parseNFeXml = (xmlText: string): { resumo: NFeResumo; items: Omit<NFeItem, 'contaContabilId'>[] } => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'application/xml');
+    const parseError = doc.getElementsByTagName('parsererror')[0];
+    if (parseError) {
+      throw new Error('XML inválido (erro de parsing).');
+    }
+
+    const ns = 'http://www.portalfiscal.inf.br/nfe';
+    const infNFe = doc.getElementsByTagNameNS(ns, 'infNFe')?.[0] || null;
+    if (!infNFe) throw new Error('XML não contém infNFe.');
+
+    const idAttr = String(infNFe.getAttribute('Id') || '');
+    const chave = idAttr.replace(/^NFe/i, '').trim();
+
+    const ide = infNFe.getElementsByTagNameNS(ns, 'ide')?.[0] || null;
+    const numero = getTextNS(ide, ns, 'nNF');
+    const dhEmi = getTextNS(ide, ns, 'dhEmi');
+    const emissaoISO = dhEmi ? dhEmi.slice(0, 10) : '';
+
+    const emit = infNFe.getElementsByTagNameNS(ns, 'emit')?.[0] || null;
+    const emitNome = getTextNS(emit, ns, 'xNome') || getTextNS(emit, ns, 'xFant');
+    const emitCnpj = getTextNS(emit, ns, 'CNPJ');
+
+    const dest = infNFe.getElementsByTagNameNS(ns, 'dest')?.[0] || null;
+    const destNome = getTextNS(dest, ns, 'xNome');
+    const destCnpj = getTextNS(dest, ns, 'CNPJ');
+
+    const icmsTot = infNFe.getElementsByTagNameNS(ns, 'ICMSTot')?.[0] || null;
+    const total = parseNumber(getTextNS(icmsTot, ns, 'vNF'));
+
+    const dup = infNFe.getElementsByTagNameNS(ns, 'dup')?.[0] || null;
+    const vencimentoISO = getTextNS(dup, ns, 'dVenc');
+
+    const detNodes = Array.from(infNFe.getElementsByTagNameNS(ns, 'det') || []);
+    const items = detNodes.map((det, index) => {
+      const prod = det.getElementsByTagNameNS(ns, 'prod')?.[0] || null;
+      const descricao = getTextNS(prod, ns, 'xProd');
+      const quantidade = parseNumber(getTextNS(prod, ns, 'qCom'));
+      const unidade = getTextNS(prod, ns, 'uCom');
+      const valor = parseNumber(getTextNS(prod, ns, 'vProd'));
+      return {
+        id: `${index + 1}`,
+        descricao,
+        quantidade,
+        unidade,
+        valor
+      };
+    });
+
+    return {
+      resumo: {
+        chave,
+        numero,
+        emissaoISO,
+        emitNome,
+        emitCnpj,
+        destNome,
+        destCnpj,
+        total,
+        vencimentoISO
+      },
+      items
+    };
+  };
+
+  const handleXmlSelected = async (file: File) => {
+    setXmlLoading(true);
+    setXmlError(null);
+    try {
+      const xmlText = await file.text();
+      const parsed = parseNFeXml(xmlText);
+      setNfeResumo(parsed.resumo);
+      setNfeItems(parsed.items.map((it) => ({ ...it, contaContabilId: '' })));
+      setSplitByItems(parsed.items.length > 0);
+
+      const vencISO = parsed.resumo.vencimentoISO || parsed.resumo.emissaoISO;
+      const fornecedor = parsed.resumo.emitNome || '';
+      const descricao = parsed.resumo.numero ? `NF-e ${parsed.resumo.numero}` : 'NF-e';
+
+      setFormData((prev) => ({
+        ...prev,
+        fornecedor,
+        descricao,
+        numeroDocumento: parsed.resumo.numero || prev.numeroDocumento,
+        dataVencimento: vencISO || prev.dataVencimento,
+        valor: parsed.resumo.total || prev.valor,
+        observacoes: [
+          prev.observacoes || '',
+          parsed.resumo.chave ? `Chave NF-e: ${parsed.resumo.chave}` : '',
+          parsed.resumo.emitCnpj ? `Emitente CNPJ: ${parsed.resumo.emitCnpj}` : '',
+          parsed.resumo.destCnpj ? `Destinatário CNPJ: ${parsed.resumo.destCnpj}` : ''
+        ]
+          .filter(Boolean)
+          .join('\n')
+      }));
+
+      if (vencISO) setDataVencimentoFormatada(convertFromISODate(vencISO));
+      if (parsed.resumo.total) setValorFormatado(formatarMoeda(parsed.resumo.total));
+    } catch (e: any) {
+      setNfeResumo(null);
+      setNfeItems([]);
+      setSplitByItems(false);
+      setXmlError(e?.message || 'Erro ao ler XML');
+    } finally {
+      setXmlLoading(false);
+      if (xmlInputRef.current) xmlInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     const generateSigned = async () => {
@@ -387,38 +540,70 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
 
   const fetchEmpresas = async () => {
     try {
-      const { data, error } = await supabase
-        .from('empresas')
-        .select('id, razao_social')
-        .eq('ativa', true)
-        .order('razao_social');
+      const { data, error } = await supabase.rpc('get_user_companies');
 
       if (error) throw error;
-      setEmpresas(data || []);
+      setEmpresas(
+        (data || []).map((row: any) => ({
+          id: row.id,
+          razao_social: row.razao_social
+        }))
+      );
     } catch (error) {
       console.error('Erro ao carregar empresas:', error);
       setError('Erro ao carregar empresas');
     }
   };
 
-  const fetchContasContabeis = async () => {
+  const fetchContasContabeis = async (empresaId?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contas_contabeis')
-        .select('id, codigo, nome, categoria, empresa_id')
+        .select('id, user_id, created_at, empresa_id, codigo, nome, categoria, tipo, ativa')
         .eq('ativa', true)
         .order('codigo');
 
+      if (empresaId) {
+        query = query.eq('empresa_id', empresaId);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      setContasContabeis(data?.map(conta => ({
-        ...conta,
-        empresaId: conta.empresa_id
-      })) || []);
+      setContasContabeis(
+        (data || []).map((item: any) => ({
+          id: item.id,
+          user_id: item.user_id,
+          created_at: item.created_at,
+          empresaId: item.empresa_id,
+          codigo: item.codigo,
+          nome: item.nome,
+          categoria: item.categoria,
+          subcategoria: item.subcategoria ?? null,
+          tipo: item.tipo,
+          ativa: item.ativa
+        }))
+      );
     } catch (error) {
       console.error('Erro ao carregar contas contábeis:', error);
-      setError('Erro ao carregar contas contábeis');
+      const msg = (error as any)?.message ? String((error as any).message) : 'Erro ao carregar contas contábeis';
+      setError(msg);
     }
   };
+
+  useEffect(() => {
+    if (conta) return;
+    if (selectedEmpresaId) return;
+    if (empresas.length === 0) return;
+    setSelectedEmpresaId(empresas[0].id);
+    setSelectedCategoriaDre('');
+    setFormData(prev => ({ ...prev, contaContabilId: '' }));
+  }, [conta, empresas, selectedEmpresaId]);
+
+  useEffect(() => {
+    if (!selectedEmpresaId) return;
+    void fetchContasContabeis(selectedEmpresaId);
+  }, [selectedEmpresaId]);
   
   // Função para buscar fornecedores já cadastrados
   const buscarFornecedoresSugeridos = async (termo: string) => {
@@ -479,11 +664,6 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
     // Chave aleatória PIX (UUID ou string alfanumérica longa)
     if (/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(valorLimpo) || 
         (valorLimpo.length >= 20 && /^[a-zA-Z0-9]+$/.test(valorLimpo))) {
-      return 'pix';
-    }
-    
-    // Se não se encaixa em nenhum padrão específico mas tem conteúdo, pode ser PIX
-    if (valorLimpo.length > 0) {
       return 'pix';
     }
     
@@ -803,18 +983,17 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           : existingComprovante;
       const previousComprovanteKey = conta?.fotoUrl ? extractStorageKey(conta.fotoUrl) : null;
   
-      // Dados corrigidos para o banco (usando snake_case para colunas do banco)
-      const contaData = {
+      const tipoDocumentoBanco = nfeResumo ? 'nfe' : (tipoDocumento === 'pix' ? 'pix' : 'boleto');
+
+      const baseContaData = {
         user_id: currentUser.id,
         fornecedor: formData.fornecedor,
-        descricao: formData.descricao,
-        valor: Number(formData.valor),
         data_vencimento: formatDateForDatabase(formData.dataVencimento),
         conta_contabil_id: formData.contaContabilId || null,
         numero_documento: formData.numeroDocumento || null,
         observacoes: formData.observacoes || null,
         empresa_id: selectedEmpresaId,
-        tipo_documento: tipoDocumento === 'pix' ? 'pix' : 'boleto',
+        tipo_documento: tipoDocumentoBanco,
         foto_url: comprovanteAtual?.url || null,
         foto_nome: comprovanteAtual?.name || null,
         status: status as ContaPagarStatus,
@@ -823,16 +1002,22 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           : null
       };
 
-      let contaId: string;
+      let contaIds: string[] = [];
 
       if (conta) {
+        const contaData = {
+          ...baseContaData,
+          descricao: formData.descricao,
+          valor: Number(formData.valor),
+          conta_contabil_id: formData.contaContabilId || null,
+        };
         const { error } = await supabase
           .from('contas_a_pagar')
           .update(contaData)
           .eq('id', conta.id);
 
         if (error) throw error;
-        contaId = conta.id;
+        contaIds = [conta.id];
 
         if (previousComprovanteKey && (uploadedComprovante || comprovanteRemoved)) {
           const { error: removeComprovanteError } = await supabase.storage
@@ -868,24 +1053,85 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
           if (removeError) throw removeError;
         }
       } else {
-        const { data, error } = await supabase
-          .from('contas_a_pagar')
-          .insert([contaData])
-          .select('id')
-          .single();
+        if (splitByItems && nfeItems.length > 0) {
+          const rows = nfeItems
+            .filter((it) => it.descricao && Number(it.valor) > 0)
+            .map((it) => ({
+              ...baseContaData,
+              descricao: it.descricao,
+              valor: Number(it.valor),
+              conta_contabil_id: it.contaContabilId || baseContaData.conta_contabil_id
+            }));
 
-        if (error) throw error;
-        contaId = data.id;
+          if (rows.length === 0) {
+            throw new Error('Nenhum item válido encontrado no XML para salvar.');
+          }
+
+          const { data, error } = await supabase
+            .from('contas_a_pagar')
+            .insert(rows)
+            .select('*');
+
+          if (error) throw error;
+          contaIds = (data || []).map((r: any) => r.id);
+
+          try {
+            const { useDRELancamento } = await import('./hooks/useDRELancamento');
+            const { sincronizarLancamentoDRE } = useDRELancamento();
+            for (const row of data || []) {
+              const contaAtualizada: ContaPagar = {
+                id: row.id,
+                empresaId: row.empresa_id,
+                fornecedor: row.fornecedor,
+                descricao: row.descricao,
+                valor: row.valor,
+                dataVencimento: row.data_vencimento,
+                dataPagamento: row.data_pagamento || undefined,
+                status: row.status,
+                observacoes: row.observacoes || undefined,
+                numeroDocumento: row.numero_documento || undefined,
+                fotoUrl: row.foto_url || undefined,
+                fotoNome: row.foto_nome || undefined,
+                fotos: [],
+                contaContabilId: row.conta_contabil_id || undefined,
+                lancamentoGeradoId: row.lancamento_gerado_id || undefined,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at
+              };
+              await sincronizarLancamentoDRE(contaAtualizada);
+            }
+          } catch (e) {
+            console.error('Erro ao gerar lançamentos DRE automático (itens):', e);
+          }
+        } else {
+          const contaData = {
+            ...baseContaData,
+            descricao: formData.descricao,
+            valor: Number(formData.valor),
+            conta_contabil_id: formData.contaContabilId || null,
+          };
+
+          const { data, error } = await supabase
+            .from('contas_a_pagar')
+            .insert([contaData])
+            .select('id')
+            .single();
+
+          if (error) throw error;
+          contaIds = [data.id];
+        }
       }
 
       // Salvar múltiplas fotos na nova tabela
       if (uploadedPhotos.length > 0) {
-        const fotosData = uploadedPhotos.map((photo, index) => ({
-          conta_pagar_id: contaId,
-          foto_url: photo.url,
-          foto_nome: photo.name,
-          ordem: index + 1
-        }));
+        const fotosData = contaIds.flatMap((contaId) =>
+          uploadedPhotos.map((photo, index) => ({
+            conta_pagar_id: contaId,
+            foto_url: photo.url,
+            foto_nome: photo.name,
+            ordem: index + 1
+          }))
+        );
 
         const { error: fotosError } = await supabase
           .from('conta_pagar_fotos')
@@ -895,37 +1141,40 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
       }
 
       try {
-        const { data: contaDataAtualizada, error: contaFetchError } = await supabase
-          .from('contas_a_pagar')
-          .select('*')
-          .eq('id', contaId)
-          .single();
+        if (contaIds.length === 1) {
+          const contaId = contaIds[0];
+          const { data: contaDataAtualizada, error: contaFetchError } = await supabase
+            .from('contas_a_pagar')
+            .select('*')
+            .eq('id', contaId)
+            .single();
 
-        if (contaFetchError) throw contaFetchError;
+          if (contaFetchError) throw contaFetchError;
 
-        if (contaDataAtualizada) {
-          const contaAtualizada: ContaPagar = {
-            id: contaDataAtualizada.id,
-            empresaId: contaDataAtualizada.empresa_id,
-            fornecedor: contaDataAtualizada.fornecedor,
-            descricao: contaDataAtualizada.descricao,
-            valor: contaDataAtualizada.valor,
-            dataVencimento: contaDataAtualizada.data_vencimento,
-            dataPagamento: contaDataAtualizada.data_pagamento || undefined,
-            status: contaDataAtualizada.status,
-            observacoes: contaDataAtualizada.observacoes || undefined,
-            numeroDocumento: contaDataAtualizada.numero_documento || undefined,
-            fotoUrl: contaDataAtualizada.foto_url || undefined,
-            fotoNome: contaDataAtualizada.foto_nome || undefined,
-            fotos: [],
-            contaContabilId: contaDataAtualizada.conta_contabil_id || undefined,
-            lancamentoGeradoId: contaDataAtualizada.lancamento_gerado_id || undefined,
-            createdAt: contaDataAtualizada.created_at,
-            updatedAt: contaDataAtualizada.updated_at
-          };
-          const { useDRELancamento } = await import('./hooks/useDRELancamento');
-          const { sincronizarLancamentoDRE } = useDRELancamento(onSave);
-          await sincronizarLancamentoDRE(contaAtualizada);
+          if (contaDataAtualizada) {
+            const contaAtualizada: ContaPagar = {
+              id: contaDataAtualizada.id,
+              empresaId: contaDataAtualizada.empresa_id,
+              fornecedor: contaDataAtualizada.fornecedor,
+              descricao: contaDataAtualizada.descricao,
+              valor: contaDataAtualizada.valor,
+              dataVencimento: contaDataAtualizada.data_vencimento,
+              dataPagamento: contaDataAtualizada.data_pagamento || undefined,
+              status: contaDataAtualizada.status,
+              observacoes: contaDataAtualizada.observacoes || undefined,
+              numeroDocumento: contaDataAtualizada.numero_documento || undefined,
+              fotoUrl: contaDataAtualizada.foto_url || undefined,
+              fotoNome: contaDataAtualizada.foto_nome || undefined,
+              fotos: [],
+              contaContabilId: contaDataAtualizada.conta_contabil_id || undefined,
+              lancamentoGeradoId: contaDataAtualizada.lancamento_gerado_id || undefined,
+              createdAt: contaDataAtualizada.created_at,
+              updatedAt: contaDataAtualizada.updated_at
+            };
+            const { useDRELancamento } = await import('./hooks/useDRELancamento');
+            const { sincronizarLancamentoDRE } = useDRELancamento(onSave);
+            await sincronizarLancamentoDRE(contaAtualizada);
+          }
         }
       } catch (e) {
         console.error('Erro ao gerar lançamento DRE automático:', e);
@@ -973,6 +1222,134 @@ export function ContaPagarForm({ conta, onSave, onCancel }: ContaPagarFormProps)
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Upload className="inline w-4 h-4 mr-1" />
+              Importar NF-e (XML)
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={xmlInputRef}
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleXmlSelected(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => xmlInputRef.current?.click()}
+                disabled={xmlLoading}
+                className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 disabled:opacity-50"
+              >
+                {xmlLoading ? 'Lendo XML...' : 'Selecionar XML'}
+              </button>
+              {nfeResumo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNfeResumo(null);
+                    setNfeItems([]);
+                    setSplitByItems(false);
+                    setXmlError(null);
+                  }}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                >
+                  Remover XML
+                </button>
+              )}
+            </div>
+
+            {xmlError && (
+              <div className="mt-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                {xmlError}
+              </div>
+            )}
+
+            {nfeResumo && (
+              <div className="mt-3 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-800">
+                  <div><span className="font-medium">NF:</span> {nfeResumo.numero || '-'}</div>
+                  <div><span className="font-medium">Emissão:</span> {nfeResumo.emissaoISO || '-'}</div>
+                  <div className="sm:col-span-2"><span className="font-medium">Fornecedor:</span> {nfeResumo.emitNome || '-'}</div>
+                  <div className="sm:col-span-2"><span className="font-medium">Chave:</span> {nfeResumo.chave || '-'}</div>
+                  <div><span className="font-medium">Total:</span> {formatarMoeda(nfeResumo.total)}</div>
+                  <div><span className="font-medium">Vencimento:</span> {nfeResumo.vencimentoISO || '-'}</div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={splitByItems}
+                      onChange={(e) => setSplitByItems(e.target.checked)}
+                      disabled={Boolean(conta) || nfeItems.length === 0}
+                    />
+                    Cadastrar produto por produto (gerar uma conta por item)
+                  </label>
+
+                  {splitByItems && nfeItems.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                        disabled={!formData.contaContabilId}
+                        onClick={() => {
+                          setNfeItems((prev) => prev.map((it) => ({ ...it, contaContabilId: formData.contaContabilId || '' })));
+                        }}
+                      >
+                        Aplicar conta contábil selecionada a todos
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {splitByItems && nfeItems.length > 0 && (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-600">
+                          <th className="py-2 pr-3">Produto</th>
+                          <th className="py-2 pr-3">Qtd</th>
+                          <th className="py-2 pr-3">Valor</th>
+                          <th className="py-2 pr-3">Conta contábil</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {nfeItems.map((it) => (
+                          <tr key={it.id} className="align-top">
+                            <td className="py-2 pr-3 text-gray-900 min-w-[280px]">{it.descricao}</td>
+                            <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">{it.quantidade} {it.unidade}</td>
+                            <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">{formatarMoeda(it.valor)}</td>
+                            <td className="py-2 pr-3">
+                              <select
+                                value={it.contaContabilId}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setNfeItems((prev) => prev.map((row) => row.id === it.id ? { ...row, contaContabilId: value } : row));
+                                }}
+                                className="w-full min-w-[260px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Selecione</option>
+                                {contasContabeisFiltradas.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.codigo} - {c.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="sm:col-span-2">
