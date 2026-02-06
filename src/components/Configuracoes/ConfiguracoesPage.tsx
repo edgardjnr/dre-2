@@ -500,40 +500,6 @@ export const ConfiguracoesPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              <div className="border border-gray-200 rounded-lg">
-                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-gray-900">Categorias DRE Cadastradas</h3>
-                  <button onClick={fetchDreCategorias} className="text-sm text-blue-600 hover:text-blue-700" disabled={loadingCategorias}>Recarregar</button>
-                </div>
-                {drePrincipais.length === 0 ? (
-                  <div className="p-4 text-sm text-gray-600">Nenhuma categoria cadastrada para esta empresa.</div>
-                ) : (
-                  <div className="divide-y divide-gray-200">
-                    {drePrincipais.map((p) => {
-                      const subs = dreSubsByPrincipal.get(p.id) || [];
-                      return (
-                        <div key={p.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-gray-900">{`${p.codigo}. ${p.nome}`}</div>
-                            <button type="button" onClick={() => requestDeleteCategoria(p.id)} className="text-red-600 hover:text-red-800 p-1" disabled={loadingCategorias} title="Excluir"><Trash2 className="h-4 w-4" /></button>
-                          </div>
-                          {subs.length > 0 && (
-                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {subs.map((s) => (
-                                <div key={s.id} className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2">
-                                  <div className="text-sm text-gray-800">{`${s.codigo} ${s.nome}`}</div>
-                                  <button type="button" onClick={() => requestDeleteCategoria(s.id)} className="text-red-600 hover:text-red-800 p-1" disabled={loadingCategorias} title="Excluir"><Trash2 className="h-4 w-4" /></button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
